@@ -4,7 +4,7 @@ GWA mapping with C. elegans
 
 ## Overview of the workflow
 
-![alt text](https://github.com/AndersenLab/cegwas2-nf/blob/master/images/Cegwas2_FLOWCHART.png)
+![alt text](https://github.com/AndersenLab/cegwas2-nf/blob/master/images/Cegwas2_flow_v2.pdf)
 
 
 ## Required software packages that should be in users PATH
