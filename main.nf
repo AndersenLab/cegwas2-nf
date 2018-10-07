@@ -293,7 +293,6 @@ process rrblup_maps {
 // but then you lose track of it when joining channels below this process and therefore need to re run same step to find all peaks
 process summarize_maps {
 
-	executor 'local'
 
 	publishDir "${params.out}/Mappings/Plots", mode: 'copy', pattern: "*mappings.pdf"
 	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*_peaks.tsv"
@@ -312,7 +311,7 @@ process summarize_maps {
 		cat *processed_mapping.tsv |\\
 		awk '\$0 !~ "NA" {print}' |\\
 		awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
-		awk 'NR>1{print \$5"_phenotype", \$2, \$12, \$13, \$14}' OFS="\\t" > QTL_peaks.tsv
+		awk 'NR>1{print \$5, \$2, \$12, \$13, \$14}' OFS="\\t" > QTL_peaks.tsv
 
 		sig_maps=`wc -l QTL_peaks.tsv | cut -f1 -d' '`
 
@@ -334,7 +333,8 @@ peaks
    .join(pr_maps_trait)
    .spread(vcf_to_fine_map)
    .spread(strain_list_finemap)
-   .set{QTL_peaks}
+   .into{QTL_peaks; QTL_peaks_print}
+
 
 process prep_ld_files {
 
@@ -362,15 +362,17 @@ process prep_ld_files {
 		    start_pos=`echo \$p | cut -f3 -d' '`
 		    peak_pos=`echo \$p | cut -f4 -d' '`
 		    end_pos=`echo \$p | cut -f5 -d' '`
-		    
+		
+		cat ${phenotype} | awk '\$0 !~ "strain" {print}' | cut -f1 > phenotyped_samples.txt
+
 		bcftools view --regions \$chromosome:\$start_pos-\$end_pos ${vcf} \
-		-S ${strains}|\\
+		-S phenotyped_samples.txt |\\
 		bcftools filter -i N_MISSING=0 |\\
 		awk '\$0 !~ "#" {print \$1":"\$2}' > \$trait.\$chromosome.\$start_pos.\$end_pos.txt
 
 
 		bcftools view --regions \$chromosome:\$start_pos-\$end_pos ${vcf} \
-		-S ${strains}|\\
+		-S phenotyped_samples.txt |\\
 		bcftools filter -i N_MISSING=0 -Oz -o finemap.vcf.gz
 
 		plink --vcf finemap.vcf.gz \\
@@ -465,18 +467,18 @@ process concatenate_LD_per_trait {
 	"""
 		for i in *prLD_df.tsv;
 		do
-			chrom=`echo \$i | cut -f1 -d"_" | rev | cut -f3 -d"." | rev`
-			start_pos=`echo \$i | cut -f1 -d"_" | rev | cut -f2 -d"." | rev`
-			end_pos=`echo \$i | cut -f1 -d"_" | rev | cut -f1 -d"." | rev`
+		chrom=`head -2 \$i | tail -1 | cut -f2`
+		start_pos=`echo \$i | rev | cut -f3 -d"_" | cut -f2 -d'.' | rev`
+		end_pos=`echo \$i | rev | cut -f3 -d"_" | cut -f1 -d'.' | rev`
 
-			echo "${TRAIT} \$chrom \$start_pos \$end_pos"
+		echo "${TRAIT} \$chrom \$start_pos \$end_pos"
 
-			awk 'BEGIN{OFS="\\t"};FNR == 1 {next};\$1=\$1' OFS="\\t" \$i |\
-			awk -v trait="${TRAIT}" \
-				-v chrom="\$chrom" \
-				-v start_pos="\$start_pos" \
-				-v end_pos="\$end_pos" \
-				'{print \$0, trait, start_pos, end_pos}' OFS="\t" > ${TRAIT}.\$chrom.\$start_pos.\$end_pos.pr_ld.tsv
+		awk 'BEGIN{OFS="\\t"};FNR == 1 {next};\$1=\$1' OFS="\\t" \$i |\
+		awk -v trait="${TRAIT}" \
+			-v chrom="\$chrom" \
+			-v start_pos="\$start_pos" \
+			-v end_pos="\$end_pos" \
+			'{print \$0, trait, start_pos, end_pos}' OFS="\t" > ${TRAIT}.\$chrom.\$start_pos.\$end_pos.pr_ld.tsv
 		done
 
 		cat *pr_ld.tsv |\
