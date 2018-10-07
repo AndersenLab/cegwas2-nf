@@ -16,7 +16,7 @@ params.genes    = "bin/gene_ref_flat.Rda"
 ~ ~ ~ > * OUTPUT DIRECTORY 
 */
 
-params.out = "${params.traitdir}-${date}"
+params.out = "Analysis_Results_${params.traitdir}-${date}"
 
 /*
 ~ ~ ~ > * INITIATE GENE LOCATION FILE 
