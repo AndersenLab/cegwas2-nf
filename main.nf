@@ -340,8 +340,6 @@ process prep_ld_files {
 
 	tag {TRAIT}
 
-	publishDir "${params.out}/Genotype_Matrix", mode: 'copy', pattern: "*ROI_Genotype_Matrix.tsv"
-
 	input:
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(strains) from QTL_peaks
 
