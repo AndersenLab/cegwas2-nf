@@ -5,7 +5,7 @@ library(cegwas2)
 args <- commandArgs(trailingOnly = TRUE)
 
 
-pr_trait_ld <- readr::read_tsv(args[1])
+pr_trait_ld <- data.table::fread(args[1])
 phenotypes <- readr::read_tsv(args[2])
 
 load(file = args[3])
