@@ -16,22 +16,13 @@ params.genes    = "bin/gene_ref_flat.Rda"
 ~ ~ ~ > * OUTPUT DIRECTORY 
 */
 
-params.out = "${params.traitdir}-${date}"
+params.out = "Analysis_Results_${params.traitdir}-${date}"
 
 /*
 ~ ~ ~ > * INITIATE GENE LOCATION FILE 
 */
 
 genes = Channel.fromPath("${params.genes}")
-
-/*
-~ ~ ~ > * INITIATE PHENOTYPE CHANNEL - GENERATES A [trait_name, trait_file] TUPLE
-*/
-
-Channel
-	.fromPath("${params.traitdir}/*")
-	.map { file -> tuple(file.baseName, file) }
-	.set{ traits_to_map }
 
 /*
 ~ ~ ~ > * INITIATE VCF AND VCF INDEX CHANNEL
@@ -96,45 +87,90 @@ log.info "Result Directory                        = ${params.out}"
 log.info ""
 }
 
+/*
+~ ~ ~ > * COMBINE VCF AND VCF INDEX INTO A CHANNEL
+*/
+
 vcf
 	.spread(vcf_index)
 	.into{vcf_to_whole_genome;
 		  vcf_to_fine_map}
+
+/*
+~ ~ ~ > * INITIATE MAPPING METHOD CHANNEL
+*/
 
 Channel
 	.from("${params.p3d}")
 	.into{p3d_full;
 		  p3d_fine}
 
+/*
+~ ~ ~ > * INITIATE THRESHOLD CHANNEL
+*/
+
 Channel
 	.from("${params.sthresh}")
 	.into{sig_threshold_full;
 		  sig_threshold_fine}
 
+/*
+~ ~ ~ > * INITIATE PHENOTYPE CHANNEL - GENERATES A [trait_name, trait_file] TUPLE
+*/
+
 Channel
 	.fromPath("${params.traitdir}/*")
+	.map { file -> tuple(file.baseName, file) }
 	.set{ traits_to_strainlist }
 
 
 
 
-process extract_strains {
+process fix_strain_names {
 
 	executor 'local'
 
+	tag {TRAIT}
+
 	input:
-		file(phenotypes) from traits_to_strainlist.collect()
+		set val(TRAIT), file(phenotypes) from traits_to_strainlist
 
 	output:
-		file("Phenotyped_Strains.txt") into strain_list
+		file("${TRAIT}.tsv") into fixed_strain_phenotypes
 
 	"""
-	 cat *.tsv | awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' > Phenotyped_Strains.txt
+		Rscript --vanilla `which Fix_Isotype_names.R`
 	"""
 
 }
 
-strain_list
+fixed_strain_phenotypes
+	.into{get_phenotyped_strains;
+		  phenotypes_to_genome_map}
+
+phenotypes_to_genome_map
+	.map { file -> tuple(file.baseName, file) }
+	.set{ traits_to_map }
+
+process get_strain_list {
+
+	executor 'local'
+
+	input:
+		file(phenotypes) from get_phenotyped_strains.collect()
+
+	output:
+		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
+
+	"""
+		cat *.tsv |\\
+		awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' |\\
+		sort > Phenotyped_Strains.txt
+	"""
+
+}
+
+phenotyped_strains_to_analyze
 	.into{strain_list_genome;
 		  strain_list_finemap}
 
@@ -228,6 +264,7 @@ process chrom_eigen_variants {
 
 }
 
+
 process collect_eigen_variants {
 
 	executor 'local'
@@ -256,6 +293,7 @@ independent_tests
 	.spread(p3d_full)
 	.spread(sig_threshold_full)
 	.set{mapping_data}
+
 
 process rrblup_maps {
 
@@ -339,8 +377,6 @@ peaks
 process prep_ld_files {
 
 	tag {TRAIT}
-
-	publishDir "${params.out}/Genotype_Matrix", mode: 'copy', pattern: "*ROI_Genotype_Matrix.tsv"
 
 	input:
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(strains) from QTL_peaks

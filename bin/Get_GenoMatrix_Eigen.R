@@ -10,6 +10,8 @@ phenotyped_strain_snps <- readr::read_tsv(args[1]) %>%
 
 analysis_chromosome <- args[2]
 
+strain_count <- (ncol(phenotyped_strain_snps) - 4)
+
 chrom_geno <- list()
 for(chrom in 1:length(unique(phenotyped_strain_snps$CHROM))){
   t_chrom <- unique(phenotyped_strain_snps$CHROM)[chrom]
@@ -36,14 +38,32 @@ lapply(chrom_geno, nrow)
 eigenvalues <- list()
 for(chrom in 1:length(chrom_geno)){
   
-  snpcor <- correlateR::cor(t(chrom_geno[[chrom]]))
+  # initialize parameters for while loop
+  test_eigenvalues <- 100
+  significant_eigenvalues <- test_eigenvalues
+  eigen_increment <- 100
   
-  snpeigen <- eigs_sym(snpcor, 100, opts = list(retvec = FALSE))
+  while (significant_eigenvalues == test_eigenvalues) {
+    
+    # first test 200 eigenvalues
+    test_eigenvalues <- test_eigenvalues + eigen_increment
+    
+    print(glue::glue("Testing {test_eigenvalues} Eigenvalues"))
+    
+    snpcor <- correlateR::cor(t(chrom_geno[[chrom]]))
+    snpeigen <- eigs_sym(snpcor, test_eigenvalues, opts = list(retvec = FALSE))
+    snpeigen$values[snpeigen$values>1] <- 1
+    
+    significant_eigenvalues <- sum(snpeigen$values)
+    
+    if(significant_eigenvalues == test_eigenvalues){
+      print(glue::glue("Significant Eigenvalues - {significant_eigenvalues} Exceeds or is Equal to the Number Tested {test_eigenvalues}\n Testing {eigen_increment} More"))
+    }
+    
+  } # end while loop
   
-  snpeigen$values[snpeigen$values>1] <- 1
-  
-  eigenvalues[[chrom]] <- sum(snpeigen$values)
-}
+  eigenvalues[[chrom]] <- significant_eigenvalues
+} # end chrom loop 
 
 evals <- unlist(eigenvalues)
 
