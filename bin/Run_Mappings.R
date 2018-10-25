@@ -114,7 +114,7 @@ manplot_edit <- function(plot_df,
 
 process_mapping_df <- function (mapping_df, 
                                 phenotype_df, 
-                                CI_size = 50, 
+                                CI_size = 100, 
                                 snp_grouping = 200, 
                                 BF = NA,
                                 geno = genotype_matrix) {
