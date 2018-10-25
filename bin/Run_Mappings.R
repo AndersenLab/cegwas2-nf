@@ -365,7 +365,7 @@ if( nrow(pxg_df) > 0 ){
   
   ggsave(filename = glue::glue("{trait_name}_pxgplot.pdf"),
          height = 4, 
-         width = 4*plot_width_scale)
+         width = 4*plot_width_scale, limitsize = FALSE)
 }
 
 
