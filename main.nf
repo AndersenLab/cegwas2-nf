@@ -10,6 +10,7 @@ params.traitdir = null
 params.vcf 		= null
 params.p3d 		= null
 params.sthresh  = null
+params.help 	= null
 params.genes    = "bin/gene_ref_flat.Rda"
 
 /*
