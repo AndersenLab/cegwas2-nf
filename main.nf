@@ -246,7 +246,8 @@ process chrom_eigen_variants {
 
 	tag { CHROM }
 
-	cpus 1
+	cpus 6
+	memory '100 GB'
 
 	input:
 		file(genotypes) from eigen_gm
