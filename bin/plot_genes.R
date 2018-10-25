@@ -58,7 +58,7 @@ tidy_genes_in_region <- genes_in_region%>%
                 NUCLEOTIDE_CHANGE = nt_change, AMINO_ACID_CHANGE = aa_change,
                 STRAND = strand, TRANSCRIPTION_START_POS = txstart, TRANSCRIPTION_END_POS = txend, 
                 PEAK_MARKER = peak_marker, PEAK_MAF = peak_maf, TRAIT = trait,
-                QTL_INTERVAL_START = start_pos, QTL_INTERVAL_START = end_pos,
+                QTL_INTERVAL_START = start_pos, QTL_INTERVAL_END = end_pos,
                 VARIANT_LD_WITH_PEAK_MARKER = ld_r2, VARIANT_LOG10p = log10p,
                 STRAIN = strain, STRAIN_GENOTYPE = allele, Phenotype_Value)
 
