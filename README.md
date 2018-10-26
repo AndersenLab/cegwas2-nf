@@ -9,6 +9,7 @@ GWA mapping with C. elegans
 
 ## Required software packages that should be in users PATH
 
+1. R-v3.4.1
 1. nextflow-0.31.1
 1. BCFtools-v1.9
 1. plink-v1.9
