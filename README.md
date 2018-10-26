@@ -50,3 +50,32 @@ nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3
 * `Finemap_QTL_Intervals.R` - Run EMMA/EMMAx on QTL region of interest. Generates fine map plot, colored by LD with peak QTL SNV found from genome-wide scan
 * `plot_genes.R` - Runs SnpEff and generates gene plot. 
 
+### Output 
+
+#### Genotype_Matrix folder
+* `Genotype_Matrix.tsv` - pruned LD-pruned genotype matrix used for GWAS and construction of kinship matrix
+* `total_independent_tests.txt` - number of independent tests determined through spectral decomposition of the genotype matrix
+
+#### Mappings folder
+
+##### Data
+* `traitname_processed_mapping.tsv` - Processed mapping data frame for each trait mapped
+* `QTL_peaks.tsv` - List of signifcant QTL identified across all traits
+
+##### Plots
+* `traitname_manplot.pdf` - Manhattan plot for each trait that was analyzed. Two significance threshold lines are present, one for the Bonferronit corrected threshold, and another for the spectral decomposition threshold.
+* `traitname_pxgplot.pdf` - Phenotype by genotype split at peak QTL positions for every significant QTL identified
+* `Summarized_mappings.pdf` - A summary plot of all QTL identified
+
+#### Fine_Mappings folder
+
+##### Data
+* `traitname_snpeff_genes.tsv` - Fine-mapping data frame for all significant QTL
+
+##### Plots
+* `traitname_qtlinterval_finemap_plot.pdf` - Fine map plot of QTL interval, colored by marker LD with the peak QTL identified from the genome-wide scan
+* `traitname_qtlinterval_gene_plot.pdf` - variant annotation plot overlaid with gene CDS for QTL interval
+
+
+
+
