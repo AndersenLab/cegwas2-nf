@@ -6,7 +6,7 @@ library(data.table)
 
 for(i in grep(".tsv", list.files(), value = T)){
   
-  temp_file <- data.table::fread(i)
+  temp_file <- data.table::fread(i, header = T)
   
   trt <- colnames(temp_file)[2]
 
