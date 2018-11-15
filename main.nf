@@ -217,17 +217,17 @@ process vcf_to_geno_matrix {
 		-R markers.txt \\
 		Phenotyped_Strain_VCF.vcf.gz |\\
 		bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' |\\
-		sed 's/[[# 0-9]*]//g' |\
-		sed 's/:GT//g' |\
-		sed 's/0|0/-1/g' |\
-		sed 's/1|1/1/g' |\
-		sed 's/0|1/NA/g' |\
-		sed 's/1|0/NA/g' |\
-		sed 's/.|./NA/g'  |\
-		sed 's/0\\/0/-1/g' |\
-		sed 's/1\\/1/1/g'  |\
-		sed 's/0\\/1/NA/g' |\
-		sed 's/1\\/0/NA/g' |\
+		sed 's/[[# 0-9]*]//g' |\\
+		sed 's/:GT//g' |\\
+		sed 's/0|0/-1/g' |\\
+		sed 's/1|1/1/g' |\\
+		sed 's/0|1/NA/g' |\\
+		sed 's/1|0/NA/g' |\\
+		sed 's/.|./NA/g'  |\\
+		sed 's/0\\/0/-1/g' |\\
+		sed 's/1\\/1/1/g'  |\\
+		sed 's/0\\/1/NA/g' |\\
+		sed 's/1\\/0/NA/g' |\\
 		sed 's/.\\/./NA/g' > Genotype_Matrix.tsv
 
 	"""
