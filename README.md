@@ -9,22 +9,21 @@ GWA mapping with C. elegans
 
 ## Required software packages that should be in users PATH
 
-1. R-v3.4.1
-1. nextflow-0.31.1
-1. BCFtools-v1.9
-1. plink-v1.9
-1. R-cegwas2-Found on GitHub
-1. R-tidyverse-v1.2.1
-1. R-correlateR-Found on GitHub
-1. R-rrBLUP-v4.6
-1. R-sommer-v3.5
-1. R-RSpectra-v0.13-1
+1. [R-v3.4.1](https://www.r-project.org/)
+1. [nextflow-0.31.1](https://www.nextflow.io/docs/latest/getstarted.html)
+1. [BCFtools-v1.9](https://samtools.github.io/bcftools/bcftools.html)
+1. [plink-v1.9](https://www.cog-genomics.org/plink2)
+1. [R-cegwas2](https://github.com/AndersenLab/cegwas2)
+1. [R-tidyverse-v1.2.1](https://www.tidyverse.org/)
+1. [R-correlateR](https://github.com/AEBilgrau/correlateR)
+1. [R-rrBLUP-v4.6](https://cran.r-project.org/web/packages/rrBLUP/rrBLUP.pdf)
+1. [R-sommer-v3.5](https://cran.r-project.org/web/packages/sommer/sommer.pdf)
+1. [R-RSpectra-v0.13-1](https://github.com/yixuan/RSpectra)
 
 ## Execution of pipeline using Nextflow
 ```
 nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF
 ```
-
 ### Parameters
 
 * `--traitdir` - is a directory that contains one file for each trait the user wants to map. The file name should correspond to the phenotype name and be in tab-delimited format (.tsv). Each phenotype file should be in the following format (replace trait_name with the phenotype of interest):
@@ -36,7 +35,7 @@ nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3
 | ... | ... | ... |
 | ECA250 | 34.096 |
 
-* `--vcf` - is a VCF file with variant data. All strains with phenotypes should be represented in the VCF used for mapping. There should also abe a tabix-generated index file (.tbi) in the same folder as the specified VCF file that has the same name as the VCF except for the addition of the `.tbi` extension. (generated using `tabix -p vcf vcfname.vcf.gz`)
+* `--vcf` - is a VCF file with variant data. All strains with phenotypes should be represented in the VCF used for mapping. There should also abe a tabix-generated index file (.tbi) in the same folder as the specified VCF file that has the same name as the VCF except for the addition of the `.tbi` extension. (generated using `tabix -p vcf vcfname.vcf.gz`). A VCF for the C. elegans species can be found on [CeNDR](https://elegansvariation.org/data/release/latest)
 
 * `--p3d` - This determines what type of kinship correction to perform prior to mapping. `TRUE` corresponds to the EMMAx method and `FALSE` corresponds to the slower EMMA method. We recommend running with `--p3d=TRUE` to make sure all files of the required files are present and in the proper format, then run with `--p3d=FALSE` for a more exact mapping.
 
