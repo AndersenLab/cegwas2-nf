@@ -724,8 +724,7 @@ process burden_mapping {
 		set val(TRAIT), file(trait_df), file(vcf), file(index), file(refflat) from burden_input
 
 	output:
-		file("*.Skat.assoc") into skat_results
-		file("*.VariableThresholdPrice.assoc") into vt_results
+		set val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc") into burden_results
 
 	"""
 		Rscript --vanilla `which makeped.R` ${trait_df}
@@ -744,6 +743,27 @@ process burden_mapping {
 		--kernel skat
 	"""
 }
+
+process plot_burden {
+
+	executor 'local'
+
+	tag {TRAIT}
+
+	publishDir "${params.out}/BURDEN/SKAT/Plots", mode: 'copy', pattern: "*SKAT.pdf"
+	publishDir "${params.out}/BURDEN/VT/Plots", mode: 'copy', pattern: "*VTprice.pdf"
+
+	input:
+		set val(TRAIT), file(skat), file(vt) from burden_results
+
+	output:
+		set file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
+
+	"""
+		Rscript --vanilla `which plot_burden.R` ${TRAIT} ${skat} ${vt}
+	"""
+}
+
 
 /*
 =====================================
