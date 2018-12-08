@@ -94,10 +94,37 @@ log.info ""
 ~ ~ ~ > * COMBINE VCF AND VCF INDEX INTO A CHANNEL
 */
 
-vcf
-	.spread(vcf_index)
-	.into{vcf_to_whole_genome;
-		  vcf_to_fine_map}
+if (params.vcf) {
+
+	vcf
+		.spread(vcf_index)
+		.into{vcf_to_whole_genome;
+			  vcf_to_fine_map}
+
+} else {
+
+	process pull_vcf {
+
+		tag {"PULLING VCF FROM CeNDR"}
+		executor 'local'
+
+		output:
+			file("*.vcf.gz") into dl_vcf
+			file("*.vcf.gz.tbi") into dl_vcf_index
+
+		"""
+			wget https://storage.googleapis.com/elegansvariation.org/releases/20180527/variation/WI.20180527.impute.vcf.gz
+			tabix -p vcf WI.20180527.impute.vcf.gz
+		"""
+	}
+
+	dl_vcf
+		.spread(dl_vcf_index)
+		.into{vcf_to_whole_genome;
+			  vcf_to_fine_map}
+
+}
+
 
 /*
 ~ ~ ~ > * INITIATE MAPPING METHOD CHANNEL
@@ -354,7 +381,7 @@ process rrblup_maps {
 	set val(TRAIT), file(geno), file(pheno) into processed_map_to_ld
 	file("*processed_mapping.tsv") into processed_map_to_summary_plot
 	set val(TRAIT), file("*processed_mapping.tsv") into pr_maps_trait
-	set file("*.pdf") into gwas_plots
+	file("*.pdf") into gwas_plots
 
 	"""
 		tests=`cat independent_snvs.csv | grep -v inde`
@@ -425,6 +452,7 @@ process prep_ld_files {
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file("*ROI_Genotype_Matrix.tsv"), file("*LD.tsv") into LD_files_to_plot
 
 	"""
+		echo "HELLO"
 		cat ${pr_map} |\\
 		awk '\$0 !~ "NA" {print}' |\\
 		awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
@@ -500,6 +528,10 @@ process prep_ld_files {
 	"""
 }
 
+LD_files_to_plot
+	.spread(p3d_fine)
+	.set{LD_files_to_finemap}
+
 process rrblup_fine_maps {
 
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_finemap_plot.pdf"
@@ -508,8 +540,8 @@ process rrblup_fine_maps {
 
 
 	input:
-		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
-		val(p3d) from p3d_fine
+		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld), val(p3d) from LD_files_to_finemap
+
 	output:
 		set file("*pdf"), file("*prLD_df.tsv") into ld_out
 		set val(TRAIT), file(phenotype), file(roi_geno_matrix), file("*prLD_df.tsv") into concat_ld_out
