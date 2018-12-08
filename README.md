@@ -6,7 +6,6 @@ GWA mapping with C. elegans
 
 ![alt text](https://github.com/AndersenLab/cegwas2-nf/blob/master/images/Cegwas2_flow_v2.png)
 
-
 ## Required software packages that should be in users PATH
 
 1. [R-v3.4.1](https://www.r-project.org/)
@@ -26,6 +25,9 @@ nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3
 ```
 ### Parameters
 
+* `nextflow main.nf --help` - will display the help message
+
+#### One of the two trait parameters is required:
 * `--traitdir` - is a directory that contains one file for each trait the user wants to map. The file name should correspond to the phenotype name and be in tab-delimited format (.tsv). Each phenotype file should be in the following format (replace trait_name with the phenotype of interest):
 
 | strain | trait_name |
@@ -35,20 +37,43 @@ nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3
 | ... | ... | ... |
 | ECA250 | 34.096 |
 
-* `--vcf` - is a VCF file with variant data. All strains with phenotypes should be represented in the VCF used for mapping. There should also abe a tabix-generated index file (.tbi) in the same folder as the specified VCF file that has the same name as the VCF except for the addition of the `.tbi` extension. (generated using `tabix -p vcf vcfname.vcf.gz`). A VCF for the C. elegans species can be found on [CeNDR](https://elegansvariation.org/data/release/latest)
+* `--traitfile` - is a tab-delimited formatted (.tsv) file that contains trait information.  Each phenotype file should be in the following format (replace trait_name with the phenotype of interest):
 
+| strain | trait_name_1 | trait_name_2 |
+| --- | --- | --- |
+| JU258 | 32.73 | 19.34 |
+| ECA640 | 34.065378 | 12.32 |
+| ... | ... | ... | 124.33 |
+| ECA250 | 34.096 | 23.1 |
+
+#### Required mapping parameters
 * `--p3d` - This determines what type of kinship correction to perform prior to mapping. `TRUE` corresponds to the EMMAx method and `FALSE` corresponds to the slower EMMA method. We recommend running with `--p3d=TRUE` to make sure all files of the required files are present and in the proper format, then run with `--p3d=FALSE` for a more exact mapping.
 
 * `--sthresh` - This determines the signficance threshold required for performing post-mapping analysis of a QTL. `BF` corresponds to Bonferroni correction, `EIGEN` corresponds to correcting for the number of independent markers in your data set, and `user-specified` corresponds to a user-defined threshold, where you replace user-specified with a number. For example `--sthresh=4` will set the threshold to a `-log10(p)` value of 4. We recommend using the strict `BF` correction as a first pass to see what the resulting data looks like. If the pipeline stops at the `summarize_maps` process, no significant QTL were discovered with the input threshold. You might want to consider lowering the threshold if this occurs. 
 
+#### Optional parameters
+* `--vcf` - is a VCF file with variant data. All strains with phenotypes should be represented in the VCF used for mapping. There should also abe a tabix-generated index file (.tbi) in the same folder as the specified VCF file that has the same name as the VCF except for the addition of the `.tbi` extension. (generated using `tabix -p vcf vcfname.vcf.gz`). If this flag is not used a VCF for the C. elegans species will be downloaded from [CeNDR](https://elegansvariation.org/data/release/latest)
+
+* `--freqUpper` - Upper bound for variant allele frequency for a variant to be considered for burden mapping. Default = 0.5
+
+* `--minburden` - The number of strains that must share a variant for that variant to be considered for burden mapping. Default = 2
+
+* `--refflat` - Genomic locations for genes used for burden mapping. A default generated from WS245 is provided in the repositories bin. 
+
+* `--genes` - Genomic locations for genes formatted for plotting purposes. A default generated from WS245 is provided in the repositories bin.
+
 ### R scripts
 
 * `Get_GenoMatrix_Eigen.R` - Takes a genotype matrix and chromosome name as input and identifies the number significant eigenvalues.
-* `Fix_Isotype_names.R` - Take sample names present in phenotype data and changes them to isotype names found on [CeNDR](elegansvariation.org)
+* `Fix_Isotype_names.R` - Take sample names present in phenotype data and changes them to isotype names found on [CeNDR](elegansvariation.org) when the `--traitdir` flag is used.
 * `Run_Mappings.R` - Performs GWA mapping using the rrBLUP R package and the EMMA or EMMAx algorithm for kinship correction. Generates manhattan plot and phenotype by genotype plot for peak positions.
 * `Summarize_Mappings.R` - Generates plot of all QTL identified in nextflow pipeline.
 * `Finemap_QTL_Intervals.R` - Run EMMA/EMMAx on QTL region of interest. Generates fine map plot, colored by LD with peak QTL SNV found from genome-wide scan
 * `plot_genes.R` - Runs SnpEff and generates gene plot. 
+* `makeped.R` - Converts trait `.tsv` files to `.ped` format for burden mapping.
+* `rvtest` - Executable to run burden mapping, can be found at the [RVtests homepage](https://github.com/zhanxw/rvtests)
+* `plot_burden.R` - Plots the results from burden mapping.
+* `Fix_Isotype_names_bulk.R` - Take sample names present in phenotype data and changes them to isotype names found on [CeNDR](elegansvariation.org) when the `--traitfile` flag is used.
 
 ### Output 
 
