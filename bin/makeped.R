@@ -7,9 +7,9 @@ args = commandArgs(trailingOnly=TRUE)
 pheno <- readr::read_tsv(args[1])
 
 # iterate through each trait and make a ped output
-for(i in 1:(ncol(fixed_names)-1)){
+for(i in 1:(ncol(pheno)-1)){
   # subset bulk input
-  t_df <- fixed_names[,c(1,i+1)]
+  t_df <- pheno[,c(1,i+1)]
   # extract strain name
   trait_name <- colnames(t_df)[2]
   # format df to ped

@@ -11,8 +11,11 @@ params.traitfile = null
 params.vcf 		 = null
 params.p3d 		 = null
 params.sthresh   = null
-params.help 	 = null
+params.freqUpper = 0.05
+params.minburden = 2
+params.refflat   = "bin/refFlat.ws245.txt"
 params.genes     = "bin/gene_ref_flat.Rda"
+params.help 	 = null
 
 /*
 ~ ~ ~ > * OUTPUT DIRECTORY 
@@ -51,8 +54,10 @@ if (params.help) {
     log.info "Mandatory arguments:"
     log.info "--traitdir               String                Name of folder that contains phenotypes. Each phenotype should be in a tab-delimited file with the phenotype name as the name of the file - e.g. Phenotype_of_interest.tsv"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
-    log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF"
+    log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
+    log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, default = 0.05"
+    log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, default = 2"
     log.info "--sthresh                String                Significance threshold for QTL - Options: BF - for bonferroni correction, EIGEN - for SNV eigen value correction, or another number e.g. 4"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest"
     log.info "--out                    String                Name of folder that will contain the results"
@@ -99,7 +104,8 @@ if (params.vcf) {
 	vcf
 		.spread(vcf_index)
 		.into{vcf_to_whole_genome;
-			  vcf_to_fine_map}
+			  vcf_to_fine_map;
+			  vcf_to_burden}
 
 } else {
 
@@ -121,7 +127,8 @@ if (params.vcf) {
 	dl_vcf
 		.spread(dl_vcf_index)
 		.into{vcf_to_whole_genome;
-			  vcf_to_fine_map}
+			  vcf_to_fine_map;
+			  vcf_to_burden}
 
 }
 
@@ -179,7 +186,8 @@ if (params.traitdir) {
 
 	phenotypes_to_genome_map
 		.map { file -> tuple(file.baseName, file) }
-		.set{ traits_to_map }
+		.into{ traits_to_map;
+			  traits_to_burden }
 
 	process get_strain_list {
 
@@ -227,7 +235,8 @@ if (params.traitdir) {
 	fixed_strain_phenotypes
 		.flatten()
 		.map { file -> tuple(file.baseName, file) }
-		.set{ traits_to_map }
+		.into{ traits_to_map;
+			  traits_to_burden }
 
 } else {
 	println """
@@ -304,8 +313,22 @@ geno_matrix
 		  mapping_gm}
 
 
+/*
+============================================================
+~ > *                                                  * < ~
+~ ~ > *                                              * < ~ ~
+~ ~ ~ > *  EIGEN DECOMPOSITION OF GENOTYPE MATRIX  * < ~ ~ ~
+~ ~ > *                                              * < ~ ~
+~ > *                                                  * < ~
+============================================================
+*/
+
 CONTIG_LIST = ["I", "II", "III", "IV", "V", "X"]
 contigs = Channel.from(CONTIG_LIST)
+
+/*
+------------ Decomposition per chromosome
+*/
 
 process chrom_eigen_variants {
 
@@ -331,6 +354,9 @@ process chrom_eigen_variants {
 
 }
 
+/*
+------------ Sum independent tests for all chromosomes
+*/
 
 process collect_eigen_variants {
 
@@ -361,6 +387,19 @@ independent_tests
 	.spread(sig_threshold_full)
 	.set{mapping_data}
 
+/*
+======================================
+~ > *                            * < ~
+~ ~ > *                        * < ~ ~
+~ ~ ~ > *  RUN GWAS MAPPING  * < ~ ~ ~
+~ ~ > *                        * < ~ ~
+~ > *                            * < ~
+======================================
+*/
+
+/*
+------------ Genome-wide scan
+*/
 
 process rrblup_maps {
 
@@ -393,6 +432,10 @@ process rrblup_maps {
 		fi
 	"""
 }
+
+/*
+------------ Generate GWAS QTL summary plot
+*/
 
 // need to run this first to find significant traits, 
 // but then you lose track of it when joining channels below this process and therefore need to re run same step to find all peaks
@@ -440,6 +483,19 @@ peaks
    .spread(strain_list_finemap)
    .into{QTL_peaks; QTL_peaks_print}
 
+/*
+======================================
+~ > *                            * < ~
+~ ~ > *                        * < ~ ~
+~ ~ ~ > *  RUN FINE MAPPING  * < ~ ~ ~
+~ ~ > *                        * < ~ ~
+~ > *                            * < ~
+======================================
+*/
+
+/*
+------------ Extract QTL interval genotype matrix
+*/
 
 process prep_ld_files {
 
@@ -532,6 +588,10 @@ LD_files_to_plot
 	.spread(p3d_fine)
 	.set{LD_files_to_finemap}
 
+/*
+------------ Run fine mapping
+*/
+
 process rrblup_fine_maps {
 
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_finemap_plot.pdf"
@@ -559,6 +619,10 @@ process rrblup_fine_maps {
 
 	"""
 }
+
+/*
+------------ Process fine mapping : concatenate QTL finemapping files for each each trait
+*/
 
 process concatenate_LD_per_trait {
 
@@ -600,6 +664,10 @@ genes
 	.spread(combined_ld_data)
 	.set{plot_fine_map_genes}
 
+/*
+------------ Plot Fine mapping results overlaid on gene locations
+*/
+
 process plot_genes {
 
 	cpus 1
@@ -619,5 +687,88 @@ process plot_genes {
 	"""
 		Rscript --vanilla `which plot_genes.R` ${ld} ${phenotype} ${genes}
 	"""
+}
+
+/*
+====================================
+~ > *                          * < ~
+~ ~ > *                      * < ~ ~
+~ ~ ~ > *  BURDEN MAPPING  * < ~ ~ ~
+~ ~ > *                      * < ~ ~
+~ > *                          * < ~
+====================================
+*/
+
+Channel
+	.fromPath("${params.refflat}")
+	.set{refflat_file}
+
+traits_to_burden
+	.spread(vcf_to_burden)
+	.spread(refflat_file)
+	.set{burden_input}
+
+process burden_mapping {
+
+	tag {TRAIT}
+
+	publishDir "${params.out}/BURDEN/SKAT/Data", mode: 'copy', pattern: "*.Skat.assoc"
+	publishDir "${params.out}/BURDEN/VT/Data", mode: 'copy', pattern: "*.VariableThresholdPrice.assoc"
+
+	input:
+		set val(TRAIT), file(trait_df), file(vcf), file(index), file(refflat) from burden_input
+
+	output:
+		file("*.Skat.assoc") into skat_results
+		file("*.VariableThresholdPrice.assoc") into vt_results
+
+	"""
+		Rscript --vanilla `which makeped.R` ${trait_df}
+
+		n_strains=`wc -l ${trait_df} | cut -f1 -d" "`
+		min_af=`bc -l <<< "${params.minburden}/(\$n_strains-1)"`
+
+		rvtest \\
+		--pheno ${TRAIT}.ped \\
+		--out ${TRAIT} \\
+		--inVcf ${vcf} \\
+		--freqUpper ${params.freqUpper} \\
+		--freqLower \$min_af \\
+		--geneFile ${refflat} \\
+		--vt price \\
+		--kernel skat
+	"""
+}
+
+workflow.onComplete {
+
+    summary = """
+
+    Pipeline execution summary
+    ---------------------------
+    Completed at: ${workflow.complete}
+    Duration    : ${workflow.duration}
+    Success     : ${workflow.success}
+    workDir     : ${workflow.workDir}
+    exit status : ${workflow.exitStatus}
+    Error report: ${workflow.errorReport ?: '-'}
+    Git info: $workflow.repository - $workflow.revision [$workflow.commitId]
+
+    """
+
+    println summary
+
+    def outlog = new File("${params.out}/log.txt")
+    outlog.newWriter().withWriter {
+        outlog << param_summary
+        outlog << summary
+    }
+
+    // mail summary
+    if (params.email) {
+        ['mail', '-s', 'cegwas2-nf', params.email].execute() << summary
+    }
+
+
 }
 
