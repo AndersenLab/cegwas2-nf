@@ -6,12 +6,13 @@
 */
 date = new Date().format( 'yyyyMMdd' )
 
-params.traitdir = null
-params.vcf 		= null
-params.p3d 		= null
-params.sthresh  = null
-params.help 	= null
-params.genes    = "bin/gene_ref_flat.Rda"
+params.traitdir  = null
+params.traitfile = null
+params.vcf 		 = null
+params.p3d 		 = null
+params.sthresh   = null
+params.help 	 = null
+params.genes     = "bin/gene_ref_flat.Rda"
 
 /*
 ~ ~ ~ > * OUTPUT DIRECTORY 
@@ -49,6 +50,7 @@ if (params.help) {
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitdir               String                Name of folder that contains phenotypes. Each phenotype should be in a tab-delimited file with the phenotype name as the name of the file - e.g. Phenotype_of_interest.tsv"
+    log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
     log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
     log.info "--sthresh                String                Significance threshold for QTL - Options: BF - for bonferroni correction, EIGEN - for SNV eigen value correction, or another number e.g. 4"
@@ -119,56 +121,92 @@ Channel
 ~ ~ ~ > * INITIATE PHENOTYPE CHANNEL - GENERATES A [trait_name, trait_file] TUPLE
 */
 
-Channel
-	.fromPath("${params.traitdir}/*")
-	.map { file -> tuple(file.baseName, file) }
-	.set{ traits_to_strainlist }
+if (params.traitdir) {
 
+	Channel
+		.fromPath("${params.traitdir}/*")
+		.map { file -> tuple(file.baseName, file) }
+		.set{ traits_to_strainlist }
 
+	process fix_strain_names {
 
+		executor 'local'
 
-process fix_strain_names {
+		tag {TRAIT}
 
-	executor 'local'
+		input:
+			set val(TRAIT), file(phenotypes) from traits_to_strainlist
 
-	tag {TRAIT}
+		output:
+			file("${TRAIT}.tsv") into fixed_strain_phenotypes
 
-	input:
-		set val(TRAIT), file(phenotypes) from traits_to_strainlist
+		"""
+			Rscript --vanilla `which Fix_Isotype_names.R`
+		"""
 
-	output:
-		file("${TRAIT}.tsv") into fixed_strain_phenotypes
+	}
 
-	"""
-		Rscript --vanilla `which Fix_Isotype_names.R`
-	"""
+	fixed_strain_phenotypes
+		.into{get_phenotyped_strains;
+			  phenotypes_to_genome_map}
 
-}
+	phenotypes_to_genome_map
+		.map { file -> tuple(file.baseName, file) }
+		.set{ traits_to_map }
 
-fixed_strain_phenotypes
-	.into{get_phenotyped_strains;
-		  phenotypes_to_genome_map}
+	process get_strain_list {
 
-phenotypes_to_genome_map
-	.map { file -> tuple(file.baseName, file) }
-	.set{ traits_to_map }
+		executor 'local'
 
-process get_strain_list {
+		input:
+			file(phenotypes) from get_phenotyped_strains.collect()
 
-	executor 'local'
+		output:
+			file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
-	input:
-		file(phenotypes) from get_phenotyped_strains.collect()
+		"""
+			cat *.tsv |\\
+			awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' |\\
+			sort > Phenotyped_Strains.txt
+		"""
 
-	output:
-		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
+	}
 
-	"""
-		cat *.tsv |\\
-		awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' |\\
-		sort > Phenotyped_Strains.txt
-	"""
+} else if (params.traitfile) {
 
+	Channel
+		.fromPath("${params.traitfile}")
+		.set{ traits_to_strainlist }
+
+	process fix_strain_names {
+
+		executor 'local'
+
+		tag {"BULK TRAIT"}
+
+		input:
+			file(phenotypes) from traits_to_strainlist
+
+		output:
+			file("*.tsv") into fixed_strain_phenotypes
+			file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
+
+		"""
+			Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes}
+		"""
+
+	}
+
+	fixed_strain_phenotypes
+		.flatten()
+		.map { file -> tuple(file.baseName, file) }
+		.set{ traits_to_map }
+
+} else {
+	println """
+    Error: No traits
+    """
+    System.exit(1)
 }
 
 phenotyped_strains_to_analyze
@@ -471,7 +509,7 @@ process rrblup_fine_maps {
 
 	input:
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
-
+		val(p3d) from p3d_fine
 	output:
 		set file("*pdf"), file("*prLD_df.tsv") into ld_out
 		set val(TRAIT), file(phenotype), file(roi_geno_matrix), file("*prLD_df.tsv") into concat_ld_out
@@ -484,7 +522,7 @@ process rrblup_fine_maps {
 
         	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
         	echo "\$ld_file"
-            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} FALSE
+            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${p3d}
         done   
 
 	"""
@@ -550,3 +588,4 @@ process plot_genes {
 		Rscript --vanilla `which plot_genes.R` ${ld} ${phenotype} ${genes}
 	"""
 }
+
