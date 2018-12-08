@@ -49,7 +49,9 @@ if (params.help) {
     log.info "                      USAGE                                     "
     log.info "----------------------------------------------------------------"
     log.info ""
-    log.info "nextflow full-marker-gwas.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE"
+    log.info "nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF # run all traits from a folder"
+    log.info "nextflow main.nf --traitdir=test_bulk --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
+    log.info "nextflow main.nf --traitdir=test_bulk --p3d=TRUE --sthresh=BF # download VCF from CeNDR"
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitdir               String                Name of folder that contains phenotypes. Each phenotype should be in a tab-delimited file with the phenotype name as the name of the file - e.g. Phenotype_of_interest.tsv"
@@ -75,7 +77,7 @@ if (params.help) {
     log.info " Required software packages to be in users path"
     log.info "BCFtools               v1.9"
     log.info "plink                  v1.9"
-    log.info "R-cegwas2	             Found on GitHub"
+    log.info "R-cegwas2              Found on GitHub"
     log.info "R-tidyverse            v1.2.1"
     log.info "R-correlateR           Found on GitHub"
     log.info "R-rrBLUP               v4.6"
@@ -89,6 +91,9 @@ log.info ""
 log.info "Phenotype Directory                     = ${params.traitdir}"
 log.info "VCF                                     = ${params.vcf}"
 log.info "P3D                                     = ${params.p3d}"
+log.info "Significance Threshold                  = ${params.sthresh}"
+log.info "Max AF for Burden Mapping               = ${params.freqUpper}"
+log.info "Min Strains with Variant for Burden     = ${params.minburden}"
 log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Gene File                               = ${params.genes}"
 log.info "Result Directory                        = ${params.out}"
@@ -739,6 +744,16 @@ process burden_mapping {
 		--kernel skat
 	"""
 }
+
+/*
+=====================================
+~ > *                           * < ~
+~ ~ > *                       * < ~ ~
+~ ~ ~ > *  GENERATE REPORT  * < ~ ~ ~
+~ ~ > *                       * < ~ ~
+~ > *                           * < ~
+=====================================
+*/
 
 workflow.onComplete {
 
