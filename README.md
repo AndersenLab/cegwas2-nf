@@ -75,7 +75,38 @@ nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3
 * `plot_burden.R` - Plots the results from burden mapping.
 * `Fix_Isotype_names_bulk.R` - Take sample names present in phenotype data and changes them to isotype names found on [CeNDR](elegansvariation.org) when the `--traitfile` flag is used.
 
-### Output 
+### Output Folder Structure
+
+```
+Genotype_Matrix
+  ├── Genotype_Matrix.tsv
+  ├── total_independent_tests.txt
+ Mappings
+  ├── Data             
+      ├── traitname_processed_mapping.tsv
+      ├── QTL_peaks.tsv
+  ├── Plots   
+      ├── traitname_manplot.pdf
+      ├── traitname_pxgplot.pdf
+      ├── Summarized_mappings.pdf
+ Fine_Mappings
+  ├── Data             
+      ├── traitname_snpeff_genes.tsv
+  ├── Plots   
+      ├── traitname_qtlinterval_finemap_plot.pdf
+      ├── traitname_qtlinterval_gene_plot.pdf
+ BURDEN
+  ├── VT             
+      ├── Data             
+          ├── traitname.VariableThresholdPrice.assoc
+      ├── Plots   
+          ├── traitname_VTprice.pdf
+  ├── SKAT   
+      ├── Data             
+          ├── traitname.Skat.assoc
+      ├── Plots   
+          ├── traitname_SKAT.pdf
+```
 
 #### Genotype_Matrix folder
 * `Genotype_Matrix.tsv` - pruned LD-pruned genotype matrix used for GWAS and construction of kinship matrix
@@ -102,5 +133,12 @@ nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3
 * `traitname_qtlinterval_gene_plot.pdf` - variant annotation plot overlaid with gene CDS for QTL interval
 
 
+#### BURDEN folder (Contains two subfolders VT/SKAT with the same structure)
 
+##### Data
+* `traitname.VariableThresholdPrice.assoc` - Genome-wide burden mapping result using VT price, see [RVtests homepage](https://github.com/zhanxw/rvtests)
+* `traitname.Skat.assoc` - Genome-wide burden mapping result using Skat, see [RVtests homepage](https://github.com/zhanxw/rvtests)
 
+##### Plots
+* `traitname_VTprice.pdf` - Genome-wide burden mapping manhattan plot for VTprice
+* `traitname_SKAT.pdf` - Genome-wide burden mapping manhattan plot for Skat
