@@ -29,14 +29,6 @@ params.out = "Analysis_Results_${params.traitdir}-${date}"
 
 genes = Channel.fromPath("${params.genes}")
 
-/*
-~ ~ ~ > * INITIATE VCF AND VCF INDEX CHANNEL
-*/
-
-vcf = Channel.fromPath("${params.vcf}")
-
-vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
-
 log.info ""
 log.info "------------------------------------------"
 log.info "        C. elegans GWAS pipeline "
@@ -105,6 +97,10 @@ log.info ""
 */
 
 if (params.vcf) {
+	
+	vcf = Channel.fromPath("${params.vcf}")
+
+	vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
 
 	vcf
 		.spread(vcf_index)
