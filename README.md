@@ -21,6 +21,8 @@ GWA mapping with C. elegans
 
 ## Execution of pipeline using Nextflow
 ```
+git clone https://github.com/AndersenLab/cegwas2-nf.git
+cd cegwas2-nf
 nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF
 ```
 ### Parameters
