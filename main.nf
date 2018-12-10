@@ -6,12 +6,16 @@
 */
 date = new Date().format( 'yyyyMMdd' )
 
-params.traitdir = null
-params.vcf 		= null
-params.p3d 		= null
-params.sthresh  = null
-params.help 	= null
-params.genes    = "bin/gene_ref_flat.Rda"
+params.traitdir  = null
+params.traitfile = null
+params.vcf 		 = null
+params.p3d 		 = null
+params.sthresh   = null
+params.freqUpper = 0.05
+params.minburden = 2
+params.refflat   = "bin/refFlat.ws245.txt"
+params.genes     = "bin/gene_ref_flat.Rda"
+params.help 	 = null
 
 /*
 ~ ~ ~ > * OUTPUT DIRECTORY 
@@ -25,14 +29,6 @@ params.out = "Analysis_Results_${params.traitdir}-${date}"
 
 genes = Channel.fromPath("${params.genes}")
 
-/*
-~ ~ ~ > * INITIATE VCF AND VCF INDEX CHANNEL
-*/
-
-vcf = Channel.fromPath("${params.vcf}")
-
-vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
-
 log.info ""
 log.info "------------------------------------------"
 log.info "        C. elegans GWAS pipeline "
@@ -45,12 +41,17 @@ if (params.help) {
     log.info "                      USAGE                                     "
     log.info "----------------------------------------------------------------"
     log.info ""
-    log.info "nextflow full-marker-gwas.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE"
+    log.info "nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF # run all traits from a folder"
+    log.info "nextflow main.nf --traitdir=test_bulk --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
+    log.info "nextflow main.nf --traitdir=test_bulk --p3d=TRUE --sthresh=BF # download VCF from CeNDR"
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitdir               String                Name of folder that contains phenotypes. Each phenotype should be in a tab-delimited file with the phenotype name as the name of the file - e.g. Phenotype_of_interest.tsv"
-    log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF"
+    log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
+    log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
+    log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, default = 0.05"
+    log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, default = 2"
     log.info "--sthresh                String                Significance threshold for QTL - Options: BF - for bonferroni correction, EIGEN - for SNV eigen value correction, or another number e.g. 4"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest"
     log.info "--out                    String                Name of folder that will contain the results"
@@ -68,7 +69,7 @@ if (params.help) {
     log.info " Required software packages to be in users path"
     log.info "BCFtools               v1.9"
     log.info "plink                  v1.9"
-    log.info "R-cegwas2	             Found on GitHub"
+    log.info "R-cegwas2              Found on GitHub"
     log.info "R-tidyverse            v1.2.1"
     log.info "R-correlateR           Found on GitHub"
     log.info "R-rrBLUP               v4.6"
@@ -83,6 +84,9 @@ log.info "Phenotype Directory                     = ${params.traitdir}"
 log.info "VCF                                     = ${params.vcf}"
 log.info "P3D                                     = ${params.p3d}"
 log.info "Significance Threshold                  = ${params.sthresh}"
+log.info "Max AF for Burden Mapping               = ${params.freqUpper}"
+log.info "Min Strains with Variant for Burden     = ${params.minburden}"
+log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Gene File                               = ${params.genes}"
 log.info "Result Directory                        = ${params.out}"
 log.info ""
@@ -92,10 +96,43 @@ log.info ""
 ~ ~ ~ > * COMBINE VCF AND VCF INDEX INTO A CHANNEL
 */
 
-vcf
-	.spread(vcf_index)
-	.into{vcf_to_whole_genome;
-		  vcf_to_fine_map}
+if (params.vcf) {
+	
+	vcf = Channel.fromPath("${params.vcf}")
+
+	vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
+
+	vcf
+		.spread(vcf_index)
+		.into{vcf_to_whole_genome;
+			  vcf_to_fine_map;
+			  vcf_to_burden}
+
+} else {
+
+	process pull_vcf {
+
+		tag {"PULLING VCF FROM CeNDR"}
+		executor 'local'
+
+		output:
+			file("*.vcf.gz") into dl_vcf
+			file("*.vcf.gz.tbi") into dl_vcf_index
+
+		"""
+			wget https://storage.googleapis.com/elegansvariation.org/releases/20180527/variation/WI.20180527.impute.vcf.gz
+			tabix -p vcf WI.20180527.impute.vcf.gz
+		"""
+	}
+
+	dl_vcf
+		.spread(dl_vcf_index)
+		.into{vcf_to_whole_genome;
+			  vcf_to_fine_map;
+			  vcf_to_burden}
+
+}
+
 
 /*
 ~ ~ ~ > * INITIATE MAPPING METHOD CHANNEL
@@ -119,56 +156,94 @@ Channel
 ~ ~ ~ > * INITIATE PHENOTYPE CHANNEL - GENERATES A [trait_name, trait_file] TUPLE
 */
 
-Channel
-	.fromPath("${params.traitdir}/*")
-	.map { file -> tuple(file.baseName, file) }
-	.set{ traits_to_strainlist }
+if (params.traitdir) {
 
+	Channel
+		.fromPath("${params.traitdir}/*")
+		.map { file -> tuple(file.baseName, file) }
+		.set{ traits_to_strainlist }
 
+	process fix_strain_names {
 
+		executor 'local'
 
-process fix_strain_names {
+		tag {TRAIT}
 
-	executor 'local'
+		input:
+			set val(TRAIT), file(phenotypes) from traits_to_strainlist
 
-	tag {TRAIT}
+		output:
+			file("${TRAIT}.tsv") into fixed_strain_phenotypes
 
-	input:
-		set val(TRAIT), file(phenotypes) from traits_to_strainlist
+		"""
+			Rscript --vanilla `which Fix_Isotype_names.R`
+		"""
 
-	output:
-		file("${TRAIT}.tsv") into fixed_strain_phenotypes
+	}
 
-	"""
-		Rscript --vanilla `which Fix_Isotype_names.R`
-	"""
+	fixed_strain_phenotypes
+		.into{get_phenotyped_strains;
+			  phenotypes_to_genome_map}
 
-}
+	phenotypes_to_genome_map
+		.map { file -> tuple(file.baseName, file) }
+		.into{ traits_to_map;
+			  traits_to_burden }
 
-fixed_strain_phenotypes
-	.into{get_phenotyped_strains;
-		  phenotypes_to_genome_map}
+	process get_strain_list {
 
-phenotypes_to_genome_map
-	.map { file -> tuple(file.baseName, file) }
-	.set{ traits_to_map }
+		executor 'local'
 
-process get_strain_list {
+		input:
+			file(phenotypes) from get_phenotyped_strains.collect()
 
-	executor 'local'
+		output:
+			file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
-	input:
-		file(phenotypes) from get_phenotyped_strains.collect()
+		"""
+			cat *.tsv |\\
+			awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' |\\
+			sort > Phenotyped_Strains.txt
+		"""
 
-	output:
-		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
+	}
 
-	"""
-		cat *.tsv |\\
-		awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' |\\
-		sort > Phenotyped_Strains.txt
-	"""
+} else if (params.traitfile) {
 
+	Channel
+		.fromPath("${params.traitfile}")
+		.set{ traits_to_strainlist }
+
+	process fix_strain_names {
+
+		executor 'local'
+
+		tag {"BULK TRAIT"}
+
+		input:
+			file(phenotypes) from traits_to_strainlist
+
+		output:
+			file("*.tsv") into fixed_strain_phenotypes
+			file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
+
+		"""
+			Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes}
+		"""
+
+	}
+
+	fixed_strain_phenotypes
+		.flatten()
+		.map { file -> tuple(file.baseName, file) }
+		.into{ traits_to_map;
+			  traits_to_burden }
+
+} else {
+	println """
+    Error: No traits
+    """
+    System.exit(1)
 }
 
 phenotyped_strains_to_analyze
@@ -239,8 +314,22 @@ geno_matrix
 		  mapping_gm}
 
 
+/*
+============================================================
+~ > *                                                  * < ~
+~ ~ > *                                              * < ~ ~
+~ ~ ~ > *  EIGEN DECOMPOSITION OF GENOTYPE MATRIX  * < ~ ~ ~
+~ ~ > *                                              * < ~ ~
+~ > *                                                  * < ~
+============================================================
+*/
+
 CONTIG_LIST = ["I", "II", "III", "IV", "V", "X"]
 contigs = Channel.from(CONTIG_LIST)
+
+/*
+------------ Decomposition per chromosome
+*/
 
 process chrom_eigen_variants {
 
@@ -266,6 +355,9 @@ process chrom_eigen_variants {
 
 }
 
+/*
+------------ Sum independent tests for all chromosomes
+*/
 
 process collect_eigen_variants {
 
@@ -296,6 +388,19 @@ independent_tests
 	.spread(sig_threshold_full)
 	.set{mapping_data}
 
+/*
+======================================
+~ > *                            * < ~
+~ ~ > *                        * < ~ ~
+~ ~ ~ > *  RUN GWAS MAPPING  * < ~ ~ ~
+~ ~ > *                        * < ~ ~
+~ > *                            * < ~
+======================================
+*/
+
+/*
+------------ Genome-wide scan
+*/
 
 process rrblup_maps {
 
@@ -316,7 +421,7 @@ process rrblup_maps {
 	set val(TRAIT), file(geno), file(pheno) into processed_map_to_ld
 	file("*processed_mapping.tsv") into processed_map_to_summary_plot
 	set val(TRAIT), file("*processed_mapping.tsv") into pr_maps_trait
-	set file("*.pdf") into gwas_plots
+	file("*.pdf") into gwas_plots
 
 	"""
 		tests=`cat independent_snvs.csv | grep -v inde`
@@ -328,6 +433,10 @@ process rrblup_maps {
 		fi
 	"""
 }
+
+/*
+------------ Generate GWAS QTL summary plot
+*/
 
 // need to run this first to find significant traits, 
 // but then you lose track of it when joining channels below this process and therefore need to re run same step to find all peaks
@@ -375,6 +484,19 @@ peaks
    .spread(strain_list_finemap)
    .into{QTL_peaks; QTL_peaks_print}
 
+/*
+======================================
+~ > *                            * < ~
+~ ~ > *                        * < ~ ~
+~ ~ ~ > *  RUN FINE MAPPING  * < ~ ~ ~
+~ ~ > *                        * < ~ ~
+~ > *                            * < ~
+======================================
+*/
+
+/*
+------------ Extract QTL interval genotype matrix
+*/
 
 process prep_ld_files {
 
@@ -387,6 +509,7 @@ process prep_ld_files {
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file("*ROI_Genotype_Matrix.tsv"), file("*LD.tsv") into LD_files_to_plot
 
 	"""
+		echo "HELLO"
 		cat ${pr_map} |\\
 		awk '\$0 !~ "NA" {print}' |\\
 		awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
@@ -462,6 +585,14 @@ process prep_ld_files {
 	"""
 }
 
+LD_files_to_plot
+	.spread(p3d_fine)
+	.set{LD_files_to_finemap}
+
+/*
+------------ Run fine mapping
+*/
+
 process rrblup_fine_maps {
 
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_finemap_plot.pdf"
@@ -470,7 +601,7 @@ process rrblup_fine_maps {
 
 
 	input:
-		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
+		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld), val(p3d) from LD_files_to_finemap
 
 	output:
 		set file("*pdf"), file("*prLD_df.tsv") into ld_out
@@ -484,11 +615,15 @@ process rrblup_fine_maps {
 
         	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
         	echo "\$ld_file"
-            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} FALSE
+            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${p3d}
         done   
 
 	"""
 }
+
+/*
+------------ Process fine mapping : concatenate QTL finemapping files for each each trait
+*/
 
 process concatenate_LD_per_trait {
 
@@ -530,6 +665,10 @@ genes
 	.spread(combined_ld_data)
 	.set{plot_fine_map_genes}
 
+/*
+------------ Plot Fine mapping results overlaid on gene locations
+*/
+
 process plot_genes {
 
 	cpus 1
@@ -550,3 +689,117 @@ process plot_genes {
 		Rscript --vanilla `which plot_genes.R` ${ld} ${phenotype} ${genes}
 	"""
 }
+
+/*
+====================================
+~ > *                          * < ~
+~ ~ > *                      * < ~ ~
+~ ~ ~ > *  BURDEN MAPPING  * < ~ ~ ~
+~ ~ > *                      * < ~ ~
+~ > *                          * < ~
+====================================
+*/
+
+Channel
+	.fromPath("${params.refflat}")
+	.set{refflat_file}
+
+traits_to_burden
+	.spread(vcf_to_burden)
+	.spread(refflat_file)
+	.set{burden_input}
+
+process burden_mapping {
+
+	tag {TRAIT}
+
+	publishDir "${params.out}/BURDEN/SKAT/Data", mode: 'copy', pattern: "*.Skat.assoc"
+	publishDir "${params.out}/BURDEN/VT/Data", mode: 'copy', pattern: "*.VariableThresholdPrice.assoc"
+
+	input:
+		set val(TRAIT), file(trait_df), file(vcf), file(index), file(refflat) from burden_input
+
+	output:
+		set val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc") into burden_results
+
+	"""
+		Rscript --vanilla `which makeped.R` ${trait_df}
+
+		n_strains=`wc -l ${trait_df} | cut -f1 -d" "`
+		min_af=`bc -l <<< "${params.minburden}/(\$n_strains-1)"`
+
+		rvtest \\
+		--pheno ${TRAIT}.ped \\
+		--out ${TRAIT} \\
+		--inVcf ${vcf} \\
+		--freqUpper ${params.freqUpper} \\
+		--freqLower \$min_af \\
+		--geneFile ${refflat} \\
+		--vt price \\
+		--kernel skat
+	"""
+}
+
+process plot_burden {
+
+	executor 'local'
+
+	tag {TRAIT}
+
+	publishDir "${params.out}/BURDEN/SKAT/Plots", mode: 'copy', pattern: "*SKAT.pdf"
+	publishDir "${params.out}/BURDEN/VT/Plots", mode: 'copy', pattern: "*VTprice.pdf"
+
+	input:
+		set val(TRAIT), file(skat), file(vt) from burden_results
+
+	output:
+		set file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
+
+	"""
+		Rscript --vanilla `which plot_burden.R` ${TRAIT} ${skat} ${vt}
+	"""
+}
+
+
+/*
+=====================================
+~ > *                           * < ~
+~ ~ > *                       * < ~ ~
+~ ~ ~ > *  GENERATE REPORT  * < ~ ~ ~
+~ ~ > *                       * < ~ ~
+~ > *                           * < ~
+=====================================
+*/
+
+workflow.onComplete {
+
+    summary = """
+
+    Pipeline execution summary
+    ---------------------------
+    Completed at: ${workflow.complete}
+    Duration    : ${workflow.duration}
+    Success     : ${workflow.success}
+    workDir     : ${workflow.workDir}
+    exit status : ${workflow.exitStatus}
+    Error report: ${workflow.errorReport ?: '-'}
+    Git info: $workflow.repository - $workflow.revision [$workflow.commitId]
+
+    """
+
+    println summary
+
+    def outlog = new File("${params.out}/log.txt")
+    outlog.newWriter().withWriter {
+        outlog << param_summary
+        outlog << summary
+    }
+
+    // mail summary
+    if (params.email) {
+        ['mail', '-s', 'cegwas2-nf', params.email].execute() << summary
+    }
+
+
+}
+

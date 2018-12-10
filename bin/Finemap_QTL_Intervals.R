@@ -26,6 +26,8 @@ map_pheno <- na.omit(pr_map) %>%
 
 map_pheno$value <- as.numeric(map_pheno$value)
 
+ROI_matrix <- ROI_matrix[colnames(ROI_matrix)%in%c("CHROM","POS","REF","ALT",map_pheno$strain)]
+
 kinship_matrix <- kinship_matrix[row.names(kinship_matrix)%in%map_pheno$strain,
                                  colnames(kinship_matrix)%in%map_pheno$strain]
 
