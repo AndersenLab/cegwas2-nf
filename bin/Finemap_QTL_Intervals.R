@@ -18,7 +18,7 @@ kinship_matrix <- rrBLUP::A.mat(t(complete_matrix[,5:ncol(complete_matrix)]),
 ROI_matrix <- readr::read_tsv(args[2]) %>%
   na.omit()
 
-pr_map <- readr::read_tsv(args[3])
+pr_map <- data.table::fread(args[3])
 
 map_pheno <- na.omit(pr_map) %>%
   dplyr::distinct(strain, value) %>%
