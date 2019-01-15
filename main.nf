@@ -15,6 +15,7 @@ params.freqUpper = 0.05
 params.minburden = 2
 params.refflat   = "bin/refFlat.ws245.txt"
 params.genes     = "bin/gene_ref_flat.Rda"
+params.cendr_v   = "20180527"
 params.help 	 = null
 
 /*
@@ -57,6 +58,7 @@ if (params.help) {
     log.info "--traitdir               String                Name of folder that contains phenotypes. Each phenotype should be in a tab-delimited file with the phenotype name as the name of the file - e.g. Phenotype_of_interest.tsv"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
     log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
+    log.info "--cendr_v                String                CeNDR release, default = 20180527"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
     log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, default = 0.05"
     log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, default = 2"
@@ -90,6 +92,7 @@ if (params.help) {
 log.info ""
 log.info "Phenotype Directory                     = ${params.traitdir}"
 log.info "VCF                                     = ${params.vcf}"
+log.info "CeNDR Release                           = ${params.cendr_v}"
 log.info "P3D                                     = ${params.p3d}"
 log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Max AF for Burden Mapping               = ${params.freqUpper}"
@@ -110,7 +113,8 @@ if (params.vcf) {
 		.spread(vcf_index)
 		.into{vcf_to_whole_genome;
 			  vcf_to_fine_map;
-			  vcf_to_burden}
+			  vcf_to_burden;
+			  vcf_to_query_vcf}
 
 } else {
 
@@ -124,8 +128,8 @@ if (params.vcf) {
 			file("*.vcf.gz.tbi") into dl_vcf_index
 
 		"""
-			wget https://storage.googleapis.com/elegansvariation.org/releases/20180527/variation/WI.20180527.impute.vcf.gz
-			tabix -p vcf WI.20180527.impute.vcf.gz
+			wget https://storage.googleapis.com/elegansvariation.org/releases/${params.cendr_v}/variation/WI.${params.cendr_v}.impute.vcf.gz
+			tabix -p vcf WI.${params.cendr_v}.impute.vcf.gz
 		"""
 	}
 
@@ -133,7 +137,8 @@ if (params.vcf) {
 		.spread(dl_vcf_index)
 		.into{vcf_to_whole_genome;
 			  vcf_to_fine_map;
-			  vcf_to_burden}
+			  vcf_to_burden;
+			  vcf_to_query_vcf}
 
 }
 
@@ -667,6 +672,7 @@ process concatenate_LD_per_trait {
 
 genes
 	.spread(combined_ld_data)
+	.spread(vcf_to_query_vcf)
 	.set{plot_fine_map_genes}
 
 /*
@@ -684,13 +690,13 @@ process plot_genes {
 	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*snpeff_genes.tsv"
 
 	input:
-		set file(genes), file(ld), file(phenotype) from plot_fine_map_genes
+		set file(genes), file(ld), file(phenotype), file(vcf), file(vcfindex) from plot_fine_map_genes
 
 	output:
 		set file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
 
 	"""
-		Rscript --vanilla `which plot_genes.R` ${ld} ${phenotype} ${genes}
+		Rscript --vanilla `which plot_genes.R` ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
 	"""
 }
 
