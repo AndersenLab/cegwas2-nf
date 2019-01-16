@@ -22,21 +22,13 @@ params.help 	 = null
 ~ ~ ~ > * OUTPUT DIRECTORY 
 */
 
-params.out = "Analysis_Results_${params.traitdir}-${date}"
+params.out = "Analysis_Results-${date}"
 
 /*
 ~ ~ ~ > * INITIATE GENE LOCATION FILE 
 */
 
 genes = Channel.fromPath("${params.genes}")
-
-/*
-~ ~ ~ > * INITIATE VCF AND VCF INDEX CHANNEL
-*/
-
-vcf = Channel.fromPath("${params.vcf}")
-
-vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
 
 log.info ""
 log.info "------------------------------------------"
@@ -108,6 +100,10 @@ log.info ""
 */
 
 if (params.vcf) {
+	
+	vcf = Channel.fromPath("${params.vcf}")
+
+	vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
 
 	vcf
 		.spread(vcf_index)
@@ -594,9 +590,9 @@ process prep_ld_files {
 	"""
 }
 
-LD_files_to_plot
-	.spread(p3d_fine)
-	.set{LD_files_to_finemap}
+//p3d_fine
+//	.spread(LD_files_to_plot)
+//	.set{LD_files_to_finemap}
 
 /*
 ------------ Run fine mapping
@@ -610,7 +606,8 @@ process rrblup_fine_maps {
 
 
 	input:
-		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld), val(p3d) from LD_files_to_finemap
+		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
+
 
 	output:
 		set file("*pdf"), file("*prLD_df.tsv") into ld_out
@@ -624,7 +621,7 @@ process rrblup_fine_maps {
 
         	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
         	echo "\$ld_file"
-            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${p3d}
+            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
         done   
 
 	"""

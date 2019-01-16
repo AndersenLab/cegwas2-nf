@@ -1,6 +1,6 @@
 *.nextflow.log*
 *.nextflow
-Analysis_Results_*
+Analysis_Results-*
 Arsenic_Traits
 propionic_acid
 Individual_Arsenic_Traits
@@ -8,5 +8,5 @@ brown_traits
 2018_DL_YA_exometabolites
 20181031_ascr_DL
 work
-test
+brown*
 report*
