@@ -18,6 +18,7 @@ GWA mapping with C. elegans
 1. [R-rrBLUP-v4.6](https://cran.r-project.org/web/packages/rrBLUP/rrBLUP.pdf)
 1. [R-sommer-v3.5](https://cran.r-project.org/web/packages/sommer/sommer.pdf)
 1. [R-RSpectra-v0.13-1](https://github.com/yixuan/RSpectra)
+1. [R-ggbeeswarm-v0.6](https://github.com/eclarke/ggbeeswarm)
 
 ## Execution of pipeline using Nextflow
 ```
