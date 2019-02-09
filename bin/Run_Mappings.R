@@ -115,7 +115,7 @@ manplot_edit <- function(plot_df,
 process_mapping_df <- function (mapping_df, 
                                 phenotype_df, 
                                 CI_size = 100, 
-                                snp_grouping = 200, 
+                                snp_grouping = 1000, 
                                 BF = NA,
                                 geno = genotype_matrix) {
   pheno <- phenotype_df 
@@ -309,8 +309,8 @@ readr::write_tsv(raw_mapping,
 
 processed_mapping <- process_mapping_df(raw_mapping, 
                                         phenotype_data, 
-                                        CI_size = 50, 
-                                        snp_grouping = 200, 
+                                        CI_size = 100, 
+                                        snp_grouping = 1000, 
                                         BF = QTL_cutoff,
                                         geno = genotype_matrix)
 

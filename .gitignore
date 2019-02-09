@@ -1,6 +1,7 @@
 *.nextflow.log*
 *.nextflow
 Analysis_Results-*
+traits
 Arsenic_Traits
 propionic_acid
 Individual_Arsenic_Traits
