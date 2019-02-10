@@ -3,26 +3,48 @@ library(tidyverse)
 library(rrBLUP)
 library(ggbeeswarm)
 
+# argument information
+# 1 - Genetoype matrix
+# 2 - Phenotype data 
+# 3 - Number of cores of parallel processing
+# 4 - P3D, Boolean, F = EMMA, T = EMMAx
+# 5 - Number of independent tests from Eigen Decomposition of SNV correlation matrix
+# 6 - String, What significance threshold to use for defining QTL, 
+#       BF = Bonferroni, 
+#       EIGEN = Defined by Number of independent tests from Eigen Decomposition of SNV correlation matrix, 
+#       or a user defined number
+# 7 - If two QTL are less than this distance from each other, combine the QTL into one, (DEFAULT = 1000)
+# 8 - Number of SNVs to the left and right of the peak marker used to define the QTL confidence interval, (DEFAULT = 150)
+
+# load arguments
 args <- commandArgs(trailingOnly = TRUE)
 
+# define the number of independent tests used for EIGEN threshold
 independent_tests <- as.numeric(args[5])
 independent_test_cutoff <- -log10(0.05/independent_tests)
 
+# Define number of cores available for parallel processing
 cores_avail <- as.numeric(args[3])
 
+# load genotype matrix
 genotype_matrix <- readr::read_tsv(args[1]) %>%
   na.omit()
 
+# load phenotpe data
 phenotype_data <- readr::read_tsv(args[2]) %>%
   na.omit() %>%
   as.data.frame()
 
+# generate kinship matrix
 kinship_matrix <- rrBLUP::A.mat(t(genotype_matrix[,5:ncol(genotype_matrix)]), n.core = cores_avail)
 
+# extract trait name from phenotype data
 trait_name <- colnames(phenotype_data)[2]
 
+# define method for setting significance threshold
 significance_threshold <- args[6]
 
+# set significance threshold
 if(significance_threshold == "BF"){
   QTL_cutoff <- NA
 } else if(significance_threshold == "EIGEN"){
@@ -32,6 +54,7 @@ if(significance_threshold == "BF"){
 }
 
 
+# mapping function
 gwa_mapping <- function (data, 
                          cores = cores_avail, 
                          kin_matrix = kinship_matrix, 
@@ -57,7 +80,7 @@ gwa_mapping <- function (data,
   return(pmap)
 }
 
-
+# plotting function
 manplot_edit <- function(plot_df, 
                          bf_line_color = "gray",
                          eigen_line_color = "gray",
@@ -112,10 +135,11 @@ manplot_edit <- function(plot_df,
   plots
 }
 
+# process mapping function
 process_mapping_df <- function (mapping_df, 
                                 phenotype_df, 
-                                CI_size = 100, 
-                                snp_grouping = 1000, 
+                                CI_size = as.numeric(args[8]), 
+                                snp_grouping = as.numeric(args[7]), 
                                 BF = NA,
                                 geno = genotype_matrix) {
   pheno <- phenotype_df 
@@ -299,25 +323,30 @@ process_mapping_df <- function (mapping_df,
 }
 system("echo begin mapping")
 
+# run mapping
 raw_mapping <- gwa_mapping(data = phenotype_data,
                         snpset = genotype_matrix,
                         kin_matrix = kinship_matrix)
 
+# save mapping data set
 readr::write_tsv(raw_mapping, 
                  path = glue::glue("{trait_name}_raw_mapping.tsv"),
                  col_names = T)
 
+# process mapping data, define QTL
 processed_mapping <- process_mapping_df(raw_mapping, 
                                         phenotype_data, 
-                                        CI_size = 100, 
-                                        snp_grouping = 1000, 
+                                        CI_size = as.numeric(args[8]), 
+                                        snp_grouping = as.numeric(args[7]), 
                                         BF = QTL_cutoff,
                                         geno = genotype_matrix)
 
+# save processed mapping data
 readr::write_tsv(processed_mapping, 
                  path = glue::glue("{trait_name}_processed_mapping.tsv"),
                  col_names = T)
 
+# generate manhattan plot
 manhattan_plot <- manplot_edit(processed_mapping)
 
 ggsave(manhattan_plot[[1]], 
@@ -325,10 +354,7 @@ ggsave(manhattan_plot[[1]],
        height = 4, 
        width = 12)
 
-
-
-
-
+# generate phenotype by genotype plot
 pxg_df <- na.omit(processed_mapping) 
 
 if( nrow(pxg_df) > 0 ){
