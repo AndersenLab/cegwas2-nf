@@ -77,7 +77,8 @@ pr_roi_ld <- roi_ld %>%
   dplyr::mutate(peak_marker = gsub("_", ":", unique(map_peaks$marker))) %>%
   dplyr::mutate(marker = gsub(":", "_", SNP_B)) %>%
   dplyr::select(peak_marker, peak_maf = MAF_A, marker, maf_marker_b = MAF_B, ld_r2 = R2) %>%
-  dplyr::left_join(roi_mapping,., by = "marker")
+  dplyr::left_join(roi_mapping,., by = "marker") %>%
+  dplyr::filter(value > 0)
 
 readr::write_tsv(pr_roi_ld, path = glue::glue("{save_name}_prLD_df.tsv"))
 
