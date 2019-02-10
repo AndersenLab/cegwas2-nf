@@ -16,6 +16,8 @@ params.minburden = 2
 params.refflat   = "bin/refFlat.ws245.txt"
 params.genes     = "bin/gene_ref_flat.Rda"
 params.cendr_v   = "20180527"
+params.group_qtl = 1000
+params.ci_size   = 150
 params.help 	 = null
 
 /*
@@ -52,10 +54,12 @@ if (params.help) {
     log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
     log.info "--cendr_v                String                CeNDR release, default = 20180527"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
-    log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, default = 0.05"
-    log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, default = 2"
+    log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
+    log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
     log.info "--sthresh                String                Significance threshold for QTL - Options: BF - for bonferroni correction, EIGEN - for SNV eigen value correction, or another number e.g. 4"
-    log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest"
+    log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
+    log.info "--group_qtl              Integer               If two QTL are less than this distance from each other, combine the QTL into one, (DEFAULT = 1000)"
+    log.info "--ci_size                Integer               Number of SNVs to the left and right of the peak marker used to define the QTL confidence interval, (DEFAULT = 150)"
     log.info "--out                    String                Name of folder that will contain the results"
     log.info ""
     log.info "--------------------------------------------------------"
@@ -77,6 +81,7 @@ if (params.help) {
     log.info "R-rrBLUP               v4.6"
     log.info "R-sommer               v3.5"
     log.info "R-RSpectra             v0.13-1"
+    log.info "R-ggbeeswarm           v0.6.0"
     log.info "--------------------------------------------------------"    
     exit 1
 } else {
@@ -138,6 +143,21 @@ if (params.vcf) {
 
 }
 
+/*
+~ ~ ~ > * INITIATE MAPPING QTL GROUPING PARAMETER
+*/
+
+Channel
+	.from("${params.ci_size}")
+	.set{qtl_ci_size}
+
+/*
+~ ~ ~ > * INITIATE MAPPING QTL CONFIDENCE INTERVAL SIZE PARAMETER
+*/
+
+Channel
+	.from("${params.group_qtl}")
+	.set{qtl_snv_groupinng}
 
 /*
 ~ ~ ~ > * INITIATE MAPPING METHOD CHANNEL
@@ -391,6 +411,8 @@ independent_tests
 	.spread(traits_to_map)
 	.spread(p3d_full)
 	.spread(sig_threshold_full)
+	.spread(qtl_snv_groupinng)
+	.spread(qtl_ci_size)
 	.set{mapping_data}
 
 /*
@@ -419,7 +441,7 @@ process rrblup_maps {
 	
 
 	input:
-	set file("independent_snvs.csv"), file(geno), val(TRAIT), file(pheno), val(P3D), val(sig_thresh) from mapping_data
+	set file("independent_snvs.csv"), file(geno), val(TRAIT), file(pheno), val(P3D), val(sig_thresh), val(qtl_grouping_size), val(qtl_ci_size) from mapping_data
 
 	output:
 	file("*raw_mapping.tsv") into raw_map
@@ -431,7 +453,7 @@ process rrblup_maps {
 	"""
 		tests=`cat independent_snvs.csv | grep -v inde`
 
-		Rscript --vanilla `which Run_Mappings.R` ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh}
+		Rscript --vanilla `which Run_Mappings.R` ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
 
 		if [ -e Rplots.pdf ]; then
     		rm Rplots.pdf
