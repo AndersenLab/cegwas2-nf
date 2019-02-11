@@ -113,16 +113,16 @@ max_logp <- unique(max(variant_df$log10p))/150
 gene_plot <- ggplot(gene_df) +
   geom_vline(aes(xintercept = peak_variant/1e6),
              linetype=3, color = "cyan")+
-  geom_segment(aes(x = POS/1e6,
-                   xend = POS/1e6,
-                   y = log10p+max_logp,
-                   yend = log10p-max_logp,
-                   color = impact), data = variant_df) +
   geom_segment(aes(x = ifelse(strand == "+", txstart/1e6, txend/1e6),
                    xend = ifelse(strand == "+", txend/1e6, txstart/1e6),
                    y = log10p,
                    yend = log10p),
                arrow = arrow(length = unit(5, "points")), size = 1) +
+  geom_segment(aes(x = POS/1e6,
+                   xend = POS/1e6,
+                   y = log10p+max_logp,
+                   yend = log10p-max_logp,
+                   color = impact), data = variant_df) +
   scale_color_manual(values = c("MODIFIER" = "gray50",
                                 "LOW" = "gray30",
                                 "MODERATE" = "orange",

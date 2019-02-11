@@ -593,7 +593,7 @@ process prep_ld_files {
 		cut -f2-10 |\\
 		sed 's/^23/X/g' | sed 's/\\t23\\t/\\tX\\t/g' > \$trait.\$chromosome.\$start_pos.\$end_pos.LD.tsv
 
-		bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' \$trait.\$chromosome.\$start_pos.\$end_pos.vcf.gz |\\
+		bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' finemap.vcf.gz |\\
 			sed 's/[[# 0-9]*]//g' |\\
 			sed 's/:GT//g' |\\
 			sed 's/0|0/-1/g' |\\
