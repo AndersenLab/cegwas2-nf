@@ -485,7 +485,7 @@ process summarize_maps {
 		Rscript --vanilla `which Summarize_Mappings.R`
 
 		cat *processed_mapping.tsv |\\
-		awk '\$0 !~ "NA" {print}' |\\
+		awk '\$0 !~ "\\tNA\\t" {print}' |\\
 		awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
 		awk 'NR>1{print \$5, \$2, \$12, \$13, \$14}' OFS="\\t" > QTL_peaks.tsv
 
@@ -538,7 +538,7 @@ process prep_ld_files {
 	"""
 		echo "HELLO"
 		cat ${pr_map} |\\
-		awk '\$0 !~ "NA" {print}' |\\
+		awk '\$0 !~ "\\tNA\\t" {print}' |\\
 		awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
 		awk 'NR>1{print \$2, \$5, \$12, \$13, \$14}' OFS="\\t" > ${TRAIT}_QTL_peaks.tsv
 
