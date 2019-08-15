@@ -9,7 +9,7 @@ GWA mapping with C. elegans
 ## Required software packages that should be in users PATH
 
 1. [R-v3.4.1](https://www.r-project.org/)
-1. [nextflow-0.31.1](https://www.nextflow.io/docs/latest/getstarted.html)
+1. [nextflow-v19.07.0](https://www.nextflow.io/docs/latest/getstarted.html)
 1. [BCFtools-v1.9](https://samtools.github.io/bcftools/bcftools.html)
 1. [plink-v1.9](https://www.cog-genomics.org/plink2)
 1. [R-cegwas2](https://github.com/AndersenLab/cegwas2)
@@ -24,21 +24,13 @@ GWA mapping with C. elegans
 ```
 git clone https://github.com/AndersenLab/cegwas2-nf.git
 cd cegwas2-nf
-nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF
+nextflow main.nf --traitfile=test_traits.tsv --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF
 ```
 ### Parameters
 
 * `nextflow main.nf --help` - will display the help message
 
 #### One of the two trait parameters is required:
-* `--traitdir` - is a directory that contains one file for each trait the user wants to map. The file name should correspond to the phenotype name and be in tab-delimited format (.tsv). Each phenotype file should be in the following format (replace trait_name with the phenotype of interest):
-
-| strain | trait_name |
-| --- | --- |
-| JU258 | 32.73 |
-| ECA640 | 34.065378 |
-| ... | ... | ... |
-| ECA250 | 34.096 |
 
 * `--traitfile` - is a tab-delimited formatted (.tsv) file that contains trait information.  Each phenotype file should be in the following format (replace trait_name with the phenotype of interest):
 
