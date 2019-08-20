@@ -196,7 +196,7 @@ process fix_strain_names_bulk {
 		file(phenotypes) from traits_to_strainlist
 
 	output:
-		file("*.tsv") into fixed_strain_phenotypes
+		file("pr_*.tsv") into fixed_strain_phenotypes
 		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
 	"""
@@ -206,8 +206,8 @@ process fix_strain_names_bulk {
 }
 
 fixed_strain_phenotypes
-	.flatten()
-	.map { file -> tuple(file.baseName, file) }
+    .flatten()
+    .map { file -> tuple(file.baseName.replaceAll(/pr_/,""), file) }
 	.into{ traits_to_map;
 		  traits_to_burden }
 
