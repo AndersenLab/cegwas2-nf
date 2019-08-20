@@ -15,7 +15,7 @@ for(i in 1:(ncol(fixed_names)-1)){
   t_df <- fixed_names[,c(1,i+1)]
   trait_name <- colnames(t_df)[2]
   write.table(t_df, 
-              file = glue::glue("{trait_name}.tsv"),
+              file = glue::glue("pr_{trait_name}.tsv"),
               quote = F, col.names = T, row.names = F, sep="\t")
 }
 
