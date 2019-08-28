@@ -44,8 +44,7 @@ if (params.help) {
     log.info "                      USAGE                                     "
     log.info "----------------------------------------------------------------"
     log.info ""
-    log.info "nextflow main.nf --traitdir=test_traits --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF # run all traits from a folder"
-    log.info "nextflow main.nf --traitdir=test_bulk --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
+    log.info "nextflow main.nf --traitfile=test_bulk --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
     log.info "nextflow main.nf --traitdir=test_bulk --p3d=TRUE --sthresh=BF # download VCF from CeNDR"
     log.info ""
     log.info "Mandatory arguments:"
@@ -181,95 +180,37 @@ Channel
 ~ ~ ~ > * INITIATE PHENOTYPE CHANNEL - GENERATES A [trait_name, trait_file] TUPLE
 */
 
-if (params.traitdir) {
 
-	Channel
-		.fromPath("${params.traitdir}/*")
-		.map { file -> tuple(file.baseName, file) }
-		.set{ traits_to_strainlist }
 
-	process fix_strain_names {
+Channel
+	.fromPath("${params.traitfile}")
+	.set{ traits_to_strainlist }
 
-		executor 'local'
+process fix_strain_names_bulk {
 
-		tag {TRAIT}
+	executor 'local'
 
-		input:
-			set val(TRAIT), file(phenotypes) from traits_to_strainlist
+	tag {"BULK TRAIT"}
 
-		output:
-			file("${TRAIT}.tsv") into fixed_strain_phenotypes
+	input:
+		file(phenotypes) from traits_to_strainlist
 
-		"""
-			Rscript --vanilla `which Fix_Isotype_names.R`
-		"""
+	output:
+		file("pr_*.tsv") into fixed_strain_phenotypes
+		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
-	}
+	"""
+		Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes}
+	"""
 
-	fixed_strain_phenotypes
-		.into{get_phenotyped_strains;
-			  phenotypes_to_genome_map}
-
-	phenotypes_to_genome_map
-		.map { file -> tuple(file.baseName, file) }
-		.into{ traits_to_map;
-			  traits_to_burden }
-
-	process get_strain_list {
-
-		executor 'local'
-
-		input:
-			file(phenotypes) from get_phenotyped_strains.collect()
-
-		output:
-			file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
-
-		"""
-			cat *.tsv |\\
-			awk '!seen[\$1]++ { print \$1 }' | awk '\$0 !~ "strain" && \$0 != "Strain" {print}' |\\
-			sort > Phenotyped_Strains.txt
-		"""
-
-	}
-
-} else if (params.traitfile) {
-
-	Channel
-		.fromPath("${params.traitfile}")
-		.set{ traits_to_strainlist }
-
-	process fix_strain_names {
-
-		executor 'local'
-
-		tag {"BULK TRAIT"}
-
-		input:
-			file(phenotypes) from traits_to_strainlist
-
-		output:
-			file("*.tsv") into fixed_strain_phenotypes
-			file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
-
-		"""
-			Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes}
-		"""
-
-	}
-
-	fixed_strain_phenotypes
-		.flatten()
-		.map { file -> tuple(file.baseName, file) }
-		.into{ traits_to_map;
-			  traits_to_burden }
-
-} else {
-	println """
-    Error: No traits
-    """
-    System.exit(1)
 }
+
+fixed_strain_phenotypes
+    .flatten()
+    .map { file -> tuple(file.baseName.replaceAll(/pr_/,""), file) }
+	.into{ traits_to_map;
+		  traits_to_burden }
+
 
 phenotyped_strains_to_analyze
 	.into{strain_list_genome;
