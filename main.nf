@@ -16,9 +16,13 @@ params.minburden = 2
 params.refflat   = "bin/refFlat.ws245.txt"
 params.genes     = "bin/gene_ref_flat.Rda"
 params.cendr_v   = "20180527"
+params.e_mem 	 = "100"
+params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
 params.ci_size   = 150
 params.help 	 = null
+
+println()
 
 /*
 ~ ~ ~ > * OUTPUT DIRECTORY 
@@ -48,21 +52,25 @@ if (params.help) {
     log.info "nextflow main.nf --traitdir=test_bulk --p3d=TRUE --sthresh=BF # download VCF from CeNDR"
     log.info ""
     log.info "Mandatory arguments:"
-    log.info "--traitdir               String                Name of folder that contains phenotypes. Each phenotype should be in a tab-delimited file with the phenotype name as the name of the file - e.g. Phenotype_of_interest.tsv"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
     log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
-    log.info "--cendr_v                String                CeNDR release, default = 20180527"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
-    log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
-    log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
+    log.info "----------------------------------------------------------------"
+    log.info "----------------------------------------------------------------"
+   	log.info "Optional arguments (General):"
+   	log.info "--out                    String                Name of folder that will contain the results"
+    log.info "--e_mem                  String                Value that corresponds to the amount of memory to allocate for eigen decomposition of chromosomes (DEFAULT = 100)"
+    log.info "--cendr_v                String                CeNDR release (DEFAULT = 20180527)"
+    log.info "Optional arguments (Marker):"
     log.info "--sthresh                String                Significance threshold for QTL - Options: BF - for bonferroni correction, EIGEN - for SNV eigen value correction, or another number e.g. 4"
-    log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
     log.info "--group_qtl              Integer               If two QTL are less than this distance from each other, combine the QTL into one, (DEFAULT = 1000)"
     log.info "--ci_size                Integer               Number of SNVs to the left and right of the peak marker used to define the QTL confidence interval, (DEFAULT = 150)"
-    log.info "--out                    String                Name of folder that will contain the results"
+    log.info "Optional arguments (Burden):"
+    log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
+    log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
+    log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
     log.info ""
     log.info "--------------------------------------------------------"
-    log.info "Optional arguments:"
     log.info "Information describing the stucture of the input files can be located in input_files/README.txt"
     log.info ""
     log.info ""
@@ -96,6 +104,7 @@ log.info "Min Strains with Variant for Burden     = ${params.minburden}"
 log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Gene File                               = ${params.genes}"
 log.info "Result Directory                        = ${params.out}"
+log.info "Eigen Memory allocation                 = ${params.eigen_mem}"
 log.info ""
 }
 
@@ -302,7 +311,7 @@ process chrom_eigen_variants {
 	tag { CHROM }
 
 	cpus 6
-	memory '100 GB'
+	memory params.eigen_mem
 
 	input:
 		file(genotypes) from eigen_gm
