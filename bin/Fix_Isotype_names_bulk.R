@@ -9,7 +9,13 @@ args <- commandArgs(trailingOnly = TRUE)
 traits <- readr::read_tsv(args[1])
 
 # fix strain names
+if(args[2] == "fix"){
 fixed_names <- cegwas2::process_phenotypes(traits)
+} else {
+  fixed_names <- traits
+}
+  
+
 
 for(i in 1:(ncol(fixed_names)-1)){
   t_df <- fixed_names[,c(1,i+1)]
