@@ -20,6 +20,7 @@ params.e_mem 	 = "100"
 params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
 params.ci_size   = 150
+params.fix_names = "fix"
 params.help 	 = null
 
 println()
@@ -209,7 +210,7 @@ process fix_strain_names_bulk {
 		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
 	"""
-		Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes}
+		Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes} ${params.fix_names}
 	"""
 
 }
