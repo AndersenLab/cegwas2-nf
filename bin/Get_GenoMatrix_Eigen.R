@@ -1,6 +1,6 @@
 library(Rcpp)
 library(tidyverse)
-library(correlateR)
+library(correlateR) ## no longer available
 library(RSpectra)
 
 args <- commandArgs(trailingOnly = TRUE)
