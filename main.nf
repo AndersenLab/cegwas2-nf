@@ -200,7 +200,7 @@ process fix_strain_names_bulk {
 		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
 	"""
-		Rscript --vanilla `which Fix_Isotype_names_bulk.R` ${phenotypes}
+		Rscript --vanilla $PWD/bin/Fix_Isotype_names_bulk.R ${phenotypes}
 	"""
 
 }
@@ -316,7 +316,7 @@ process chrom_eigen_variants {
 	"""
 		cat Genotype_Matrix.tsv |\\
 		awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
-		Rscript --vanilla `which Get_GenoMatrix_Eigen.R` ${CHROM}_gm.tsv ${CHROM}
+		Rscript --vanilla $PWD/bin/Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
 	"""
 
 }
@@ -394,7 +394,7 @@ process rrblup_maps {
 	"""
 		tests=`cat independent_snvs.csv | grep -v inde`
 
-		Rscript --vanilla `which Run_Mappings.R` ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
+		Rscript --vanilla $PWD/bin/Run_Mappings.R ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
 
 		if [ -e Rplots.pdf ]; then
     		rm Rplots.pdf
@@ -423,7 +423,7 @@ process summarize_maps {
 
 
 	"""
-		Rscript --vanilla `which Summarize_Mappings.R`
+		Rscript --vanilla $PWD/bin/Summarize_Mappings.R
 
 		cat *processed_mapping.tsv |\\
 		awk '\$0 !~ "\\tNA\\t" {print}' |\\
@@ -564,7 +564,7 @@ process prep_ld_files {
 process rrblup_fine_maps {
 
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_finemap_plot.pdf"
-
+	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*_prLD_df.tsv"
 	tag {"${TRAIT} ${CHROM}:${start_pos}-${end_pos}"}
 
 
@@ -584,7 +584,7 @@ process rrblup_fine_maps {
 
         	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
         	echo "\$ld_file"
-            Rscript --vanilla `which Finemap_QTL_Intervals.R` ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
+            Rscript --vanilla $PWD/bin/Finemap_QTL_Intervals.R ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
         done   
 
 	"""
@@ -656,7 +656,7 @@ process plot_genes {
 		set file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
 
 	"""
-		Rscript --vanilla `which plot_genes.R` ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
+		Rscript --vanilla $PWD/bin/plot_genes.R ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
 	"""
 }
 
@@ -693,7 +693,7 @@ process burden_mapping {
 		set val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc") into burden_results
 
 	"""
-		Rscript --vanilla `which makeped.R` ${trait_df}
+		Rscript --vanilla $PWD/bin/makeped.R ${trait_df}
 
 		n_strains=`wc -l ${trait_df} | cut -f1 -d" "`
 		min_af=`bc -l <<< "${params.minburden}/(\$n_strains-1)"`
@@ -726,7 +726,7 @@ process plot_burden {
 		set file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
 
 	"""
-		Rscript --vanilla `which plot_burden.R` ${TRAIT} ${skat} ${vt}
+		Rscript --vanilla $PWD/bin/plot_burden.R ${TRAIT} ${skat} ${vt}
 	"""
 }
 
