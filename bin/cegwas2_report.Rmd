@@ -1,0 +1,422 @@
+---
+title: "cegwas2 report for TRAIT_NAME_HOLDER"
+output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+
+## need to replace my notes with actual report information for users.
+
+1. This R Markdown file should be able to find all data tables and knit out of the box.
+2. It will generate plots (almost) identical to the plots in Analysis folder.
+3. ggsave code is kept for users to make customized plots. 
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggbeeswarm)
+library(rrBLUP)
+library(plotly)
+library(DT)
+```
+
+
+
+```{r echo=FALSE}
+# load trait name
+# in nextflow use sed to edit this field and make a copy of the .rmd for each trait
+trait_name="TRAIT_NAME_HOLDER"   
+
+# load independent tests result
+total_independent_tests <- read.table("Genotype_Matrix/total_independent_tests.txt", quote="\"", comment.char="", stringsAsFactors=FALSE)
+
+independent_tests <- total_independent_tests[[1]]
+
+independent_test_cutoff <- -log10(0.05/independent_tests)
+
+```
+
+
+<br>
+<br>
+
+## Manhatton plot
+
+```{r, echo=FALSE, fig.height=4, fig.width=10, out.height=360, out.width=900}
+# load processed mapping data. 
+# Note that readr::read_delim will throw parsing errors and put NA in rows that contain actual values in strain/value/allele/var.exp so did not use it
+processed_mapping <- read.delim(paste0("Mappings/Data/",trait_name,"_processed_mapping.tsv"), stringsAsFactors=FALSE)
+
+
+# each trait has a separate processed_mapping file now. So the plotting function and loop is removed
+# but do check there is only 1 trait and if not, issue warning:
+num_traits = length(unique(dplyr::select(processed_mapping,trait)))
+
+if(num_traits > 1){
+    print("More than 1 trait in processed_mapping table. Only the first one will be plotted.")
+}
+
+
+
+# Generate _manplot from Run_Mappings.R
+
+manhattan_plot = processed_mapping %>%
+    dplyr::filter(trait == unique(processed_mapping$trait)[1] & CHROM != "MtDNA") %>%
+    dplyr::distinct(marker, .keep_all = T) %>%
+    dplyr::mutate(EIGEN_CUTOFF = independent_test_cutoff) %>%
+    dplyr::mutate(EIGEN_SIG = ifelse(log10p > BF, "1", 
+                                     ifelse(log10p > EIGEN_CUTOFF, "2", "0")) )%>%
+    ggplot2::ggplot(.) +
+    ggplot2::aes(x = POS/1e6, y = log10p) +
+    ggplot2::scale_color_manual(values = c("0" = "black", 
+                                           "1" = "red",
+                                           "2" = "hotpink3")) +
+    ggplot2::geom_rect(ggplot2::aes(xmin = startPOS/1e6, 
+                                    xmax = endPOS/1e6, 
+                                    ymin = 0, 
+                                    ymax = Inf, 
+                                    fill = "blue"), 
+                       color = "blue",fill = "cyan",linetype = 2, 
+                       alpha=.3)+
+    ggplot2::geom_hline(ggplot2::aes(yintercept = BF),
+                        color = "gray", 
+                        alpha = .75,  
+                        size = 1) +
+    ggplot2::geom_hline(ggplot2::aes(yintercept = EIGEN_CUTOFF),
+                        color = "gray", 
+                        alpha = .75,  
+                        size = 1,
+                        linetype = 2) +
+    ggplot2::geom_point( ggplot2::aes(color= factor(EIGEN_SIG)) ) +
+    ggplot2::facet_grid( . ~ CHROM, scales = "free_x" , space = "free_x") +
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
+                   axis.text.y = ggplot2::element_text(size = 16),
+                   axis.title.x = ggplot2::element_text(size = 20, face = "bold", color = "black", vjust = -0.3), 
+                   axis.title.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   strip.text.x = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   strip.text.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   plot.title = ggplot2::element_text(size = 24, face = "bold", vjust = 1), 
+                   panel.background = ggplot2::element_rect(color = "black",size = 1.2),
+                   legend.position = "none",
+                   strip.background = element_blank()) +
+    ggplot2::labs(x = "Genomic Position (Mb)",
+                  y = expression(-log[10](italic(p))))
+
+
+# save the plot to file
+# ggsave(manhattan_plot, 
+#        filename = paste0(trait_name, "_manplot.pdf"),
+#        height = 4, 
+#        width = 12)
+
+# show plot in html output
+manhattan_plot
+```
+
+
+
+```{r echo=FALSE}
+# read in peaks for all traits, quit knitting if there are no significant peaks for this trait
+if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
+    
+    QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
+        dplyr::filter(V1==trait_name)  %>% rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5)
+    
+    plot_height_all_peaks = 300*nrow(QTL_peaks) # define size of plot based on number of peaks
+    
+    if (nrow(QTL_peaks)==0) {
+        print("No significant peak for this trait")
+        knitr::knit_exit()      
+        sessionInfo()
+    }
+} else { 
+    print("No significant peak for this trait")
+    # sessionInfo() # why sessionInfo doesn't run if put before knit_exit??
+    knitr::knit_exit()
+    sessionInfo()  # why anything still runs after knit_exit()?
+}
+```
+
+
+<br>
+<br>
+
+## Interactive pxgplot and fine mapping plot for each peak region
+
+```{r echo=FALSE, out.height=plot_height_all_peaks, out.width=900}
+# first create a list to put plotly plots since they cannot be printed within for loops in r markdown
+plotly_plot_list <- htmltools::tagList()
+
+
+# print out the table to html
+DT::datatable(QTL_peaks)
+
+
+# For each peak, make 1 row of plots  
+for (n in 1:nrow(QTL_peaks)) {
+    
+    peak_name = paste0(QTL_peaks[n, "Trait"],".",QTL_peaks[n, "Chrom"],".",QTL_peaks[n, "Region_start"],".",QTL_peaks[n, "Region_end"])
+    
+    ############## phenotype-genotype plot from Run_Mapping.R
+    pxg_df <- na.omit(processed_mapping) %>% dplyr::filter(CHROM==QTL_peaks[n, "Chrom"], peakPOS==QTL_peaks[n, "Peak"]) %>%  # probably the na.omit is not needed any more
+        dplyr::mutate(mean_pheno = mean(as.numeric(value), na.rm = T)) 
+    
+    
+    pxg_plot <- pxg_df %>% 
+        ggplot()+
+        aes(x = factor(allele, levels = c(-1,1), labels = c("REF","ALT")), label_plotly=strain)+
+        geom_beeswarm(cex=4, priority='density',
+                      aes(y = as.numeric(value)),
+                      shape = 21, 
+                      fill = "gray50",
+                      size = 2)+
+        geom_point(aes(y = mean_pheno), 
+                   fill = "red", 
+                   size = 3, 
+                   shape = 25)+
+        theme_bw(15)+
+        labs(y = trait_name,
+             x = "Genotype") +
+        theme(axis.text.x = ggplot2::element_text(size = 14),
+              axis.text.y = ggplot2::element_text(size = 14),
+              axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
+              axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
+              strip.text.x = element_text(size = 14, face = "bold"))+
+        theme(legend.position = "none") +
+        ggtitle(paste0())
+    
+    
+    # save plot to file
+    # ggsave(pxg_plot, filename = paste0(peak_name, "_pxgplot.pdf"),
+    #        height = 4, 
+    #        width = 4, limitsize = FALSE)
+    
+
+    # store plot for html output
+    plotly_plot_list[[1+(n-1)*2]] <- ggplotly(pxg_plot, tooltip = c("label_plotly", "y"))
+    
+    
+    
+    #################### Generate fine mapping plots from Finemap_QTL_Intervals.R
+
+    # load data. File name format is PC1.II.7319019.8506109_prLD_df.tsv
+    prLD_file_name = paste0("Fine_Mappings/Data/",QTL_peaks[n, "Trait"],".",QTL_peaks[n, "Chrom"],".",QTL_peaks[n, "Region_start"],".",QTL_peaks[n, "Region_end"],"_prLD_df.tsv")
+    
+    pr_roi_ld <- read.delim(prLD_file_name, stringsAsFactors=FALSE) %>% 
+        dplyr::mutate(marker = stringr::str_replace(marker, "_", ":")) 
+    
+    peak_roi_marker <- dplyr::filter(pr_roi_ld, POS == QTL_peaks[n, "Peak"])
+    
+    ld_plot <- pr_roi_ld %>% na.omit() %>% ggplot() +
+        aes(x = POS/1e6, label_plotly_ld = marker) +
+        geom_point(aes(fill = ld_r2, y = value), shape = 23, size = 2) +
+        geom_point(data = peak_roi_marker, aes(y = value), shape = 23, size = 2, fill = "red") +
+        scale_fill_viridis_c(name = "R2") +
+        theme_bw(15)+
+        labs(x = "Genomic Position (Mb)",
+             y = "-log[10]p")
+    # note the color of ld_plot is different in the saved plot and in html output. I couldn't get plotly to carry over the color set by ggplot
+    
+    
+    # save plot to file
+    # ggsave(ld_plot, filename = paste0(peak_name, "_finemap_plot.pdf"),
+    #        height = 4,
+    #        width = 12)
+    # 
+    
+    # store plot for html output
+    # ggplotly will change the fill color... open bug https://github.com/ropensci/plotly/issues/907
+    # so remove the legend to be less confusing
+    plotly_plot_list[[2+(n-1)*2]] <- hide_colorbar(ggplotly(ld_plot, tooltip = c("label_plotly_ld", "y"))) 
+}
+
+
+# show plot in html output
+plotly::subplot(plotly_plot_list, shareY = FALSE, titleX = TRUE, titleY = TRUE, nrows = n, margin=0.1, widths=c(0.3, 0.7)) 
+```
+
+
+<br>
+<br>
+
+## Gene plot for each peak region (should make interactive to show gene name?)
+
+```{r, echo=FALSE, fig.height=5, fig.width=8, out.height=500, out.width=800}
+# read in data table 
+tidy_genes_in_region <- read.delim(paste0("Fine_Mappings/Data/", trait_name, "_snpeff_genes.tsv"), stringsAsFactors=FALSE)
+
+
+# make 1 plot for each peak region
+for(r in 1:length(unique(tidy_genes_in_region$QTL_INTERVAL_START))){
+    
+    gene_df <- tidy_genes_in_region %>%
+        dplyr::filter(QTL_INTERVAL_START == unique(tidy_genes_in_region$QTL_INTERVAL_START)[r]) %>%
+        dplyr::distinct(WBGeneID, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p) %>%
+        dplyr::group_by(WBGeneID) %>%
+        dplyr::mutate(VARIANT_LOG10p = max(VARIANT_LOG10p, na.rm = T)) %>%
+        dplyr::distinct()
+    
+    peak_variant <- as.numeric(strsplit(unique(gene_df$PEAK_MARKER), split = ":")[[1]][2])
+    
+    variant_df <- tidy_genes_in_region %>%
+        dplyr::filter(QTL_INTERVAL_START == unique(tidy_genes_in_region$QTL_INTERVAL_START)[r]) %>%
+        dplyr::distinct(CHROM, POS, VARIANT_LOG10p, VARIANT_IMPACT)
+    
+    variant_df$VARIANT_IMPACT[is.na(variant_df$VARIANT_IMPACT)] <- "Intergenic"
+    
+    xs <- unique(gene_df$QTL_INTERVAL_START)
+    xe <- unique(gene_df$QTL_INTERVAL_END)
+    gc <- unique(gene_df$CHROM)
+    
+    max_logp <- unique(max(variant_df$VARIANT_LOG10p))/150
+    
+    gene_plot <- ggplot(gene_df) +
+        geom_vline(aes(xintercept = peak_variant/1e6),
+                   linetype=3, color = "cyan")+
+        geom_segment(aes(x = ifelse(STRAND == "+", TRANSCRIPTION_START_POS/1e6, TRANSCRIPTION_END_POS/1e6),
+                         xend = ifelse(STRAND == "+", TRANSCRIPTION_END_POS/1e6, TRANSCRIPTION_START_POS/1e6),
+                         y = VARIANT_LOG10p,
+                         yend = VARIANT_LOG10p),
+                     arrow = arrow(length = unit(5, "points")), size = 1) +
+        geom_segment(aes(x = POS/1e6,
+                         xend = POS/1e6,
+                         y = VARIANT_LOG10p+max_logp,
+                         yend = VARIANT_LOG10p-max_logp,
+                         color = VARIANT_IMPACT), data = variant_df) +
+        scale_color_manual(values = c("MODIFIER" = "gray50",
+                                      "LOW" = "gray30",
+                                      "MODERATE" = "orange",
+                                      "HIGH" = "red",
+                                      "Intergenic" = "gray80"),
+                           breaks = c("HIGH", "MODERATE", "LOW", "MODIFIER", "Intergenic"),
+                           name = "EFFECT")+
+        labs(x = "Genomic Position (Mb)",
+             y = "-log[10]p") +
+        theme_bw(18)+
+        xlim(c(xs/1e6, xe/1e6)) +
+        theme(legend.position = "top",
+              panel.grid = element_blank())
+    
+    
+    # save plot to file
+    # ggsave(gene_plot,
+    #        filename = paste0(trait_name, ".", gc, ".",  xs, ".", xe, "_gene_plot.pdf"),
+    #        height=10, width = 14)
+    
+    
+    # show plot in html output
+    print(gene_plot)
+    
+}
+
+```
+
+
+<br>
+<br>
+
+## Burden mapping plots
+
+```{r, echo=FALSE, fig.height=4, fig.width=10, out.height=360, out.width=900}
+# plots from plot_burden.R
+# Plot SKAT
+skat <- read.delim(paste0("BURDEN/SKAT/Data/", trait_name, ".Skat.assoc"), stringsAsFactors=FALSE) %>%
+    dplyr::rowwise() %>%
+    dplyr::mutate(CHROM = strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][1],
+                  POS = as.numeric(strsplit(strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][2],split = "-")[[1]][1]),
+                  endPOS = as.numeric(strsplit(strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][2],split = "-")[[1]][2]))%>%
+    dplyr::mutate(size = abs(POS-endPOS)) %>%
+    dplyr::filter(CHROM!="MtDNA")%>%
+    dplyr::ungroup()%>%
+    dplyr::filter(NumVar > 1)%>%
+    dplyr::mutate(significant = ifelse(Pvalue < .05/n(), TRUE,FALSE ))%>%
+    dplyr::arrange(Pvalue)
+
+skat_plot <- skat%>%
+    ggplot()+
+    aes(x = POS/1e6, y = -log10(Pvalue), alpha = 0.5, color = significant)+
+    geom_point()+
+    scale_color_manual(values=c("black","red"))+
+    facet_grid(.~CHROM, scales = "free", space = "free")+
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
+                   axis.text.y = ggplot2::element_text(size = 16),
+                   axis.title.x = ggplot2::element_text(size = 20, face = "bold", color = "black", vjust = -0.3), 
+                   axis.title.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   strip.text.x = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   strip.text.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   plot.title = ggplot2::element_text(size = 24, face = "bold", vjust = 1), 
+                   panel.background = ggplot2::element_rect(color = "black",size = 1.2),
+                   legend.position = "none",
+                   strip.background = element_blank())+
+    labs(x = "Genomic Position (Mb)", 
+         y = expression(-log[10](italic(p))))
+
+# save plot to file
+# ggsave(filename = paste0(trait_name, "_SKAT.pdf"), 
+#        plot = skat_plot,
+#        height = 4, 
+#        width = 12)
+
+# print plot to html output
+print(skat_plot)
+
+
+##############
+# PLOT VTprice
+benreg_burden <- read.delim(paste0("BURDEN/VT/Data/", trait_name, ".VariableThresholdPrice.assoc"), stringsAsFactors=FALSE)
+benreg_burden$Gene <- as.character(benreg_burden$Gene)
+benreg_burden$RANGE <- as.character(benreg_burden$RANGE)
+
+benreg_burden<-benreg_burden%>%
+    dplyr::rowwise()%>%
+    dplyr::mutate(CHROM = strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][1],
+                  POS = as.numeric(strsplit(strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][2],split = "-")[[1]][1]),
+                  endPOS = as.numeric(strsplit(strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][2],split = "-")[[1]][2]))%>%
+    dplyr::mutate(size = abs(POS-endPOS)) %>%
+    ungroup()%>%
+    dplyr::mutate(significant = ifelse(PermPvalue < .05/n(), TRUE,FALSE ))%>%
+    dplyr::filter(CHROM!="MtDNA",NumVar>1,size >500)
+
+burden_manplot <- benreg_burden%>%
+    ggplot()+
+    aes(x = POS/1e6, y = Stat, size = NumVar, alpha = 0.5, color = significant)+
+    geom_point(size = 0.25)+
+    scale_color_manual(values=c("black","red"))+
+    facet_grid(.~CHROM, scales = "free", space = "free")+
+    theme_bw()+
+    ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
+                   axis.text.y = ggplot2::element_text(size = 16),
+                   axis.title.x = ggplot2::element_text(size = 20, face = "bold", color = "black", vjust = -0.3), 
+                   axis.title.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   strip.text.x = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   strip.text.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
+                   plot.title = ggplot2::element_text(size = 24, face = "bold", vjust = 1), 
+                   panel.background = ggplot2::element_rect(color = "black",size = 1.2),
+                   legend.position = "none",
+                   strip.background = element_blank())+
+    labs(x = "Genomic Position (Mb)", y = "Test Statisitic")
+
+# save plot to file
+# ggsave(filename = paste0(trait_name, "_VTprice.pdf"), 
+#        plot = burden_manplot,
+#        height = 4, 
+#        width = 12)
+
+# show plot in html output
+print(burden_manplot)
+```
+
+
+
+```{r}
+sessionInfo()
+```
