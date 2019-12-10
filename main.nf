@@ -90,7 +90,6 @@ log.info "Phenotype Directory                     = ${params.traitdir}"
 log.info "VCF                                     = ${params.vcf}"
 log.info "CeNDR Release                           = ${params.cendr_v}"
 log.info "P3D                                     = ${params.p3d}"
-log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Max AF for Burden Mapping               = ${params.freqUpper}"
 log.info "Min Strains with Variant for Burden     = ${params.minburden}"
 log.info "Significance Threshold                  = ${params.sthresh}"
@@ -200,7 +199,7 @@ process fix_strain_names_bulk {
 		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
 	"""
-		Rscript --vanilla $PWD/bin/Fix_Isotype_names_bulk.R ${phenotypes}
+		Rscript --vanilla "$PWD/bin/Fix_Isotype_names_bulk.R" ${phenotypes}
 	"""
 
 }
@@ -301,8 +300,8 @@ process chrom_eigen_variants {
 
 	tag { CHROM }
 
-	cpus 6
-	memory '100 GB'
+	cpus 2
+	memory '10 GB'
 
 	input:
 		file(genotypes) from eigen_gm
@@ -316,7 +315,7 @@ process chrom_eigen_variants {
 	"""
 		cat Genotype_Matrix.tsv |\\
 		awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
-		Rscript --vanilla $PWD/bin/Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
+		Rscript --vanilla "$PWD/bin/Get_GenoMatrix_Eigen.R" ${CHROM}_gm.tsv ${CHROM}
 	"""
 
 }
@@ -394,7 +393,7 @@ process rrblup_maps {
 	"""
 		tests=`cat independent_snvs.csv | grep -v inde`
 
-		Rscript --vanilla $PWD/bin/Run_Mappings.R ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
+		Rscript --vanilla "$PWD/bin/Run_Mappings.R" ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
 
 		if [ -e Rplots.pdf ]; then
     		rm Rplots.pdf
@@ -423,7 +422,7 @@ process summarize_maps {
 
 
 	"""
-		Rscript --vanilla $PWD/bin/Summarize_Mappings.R
+		Rscript --vanilla "$PWD/bin/Summarize_Mappings.R"
 
 		cat *processed_mapping.tsv |\\
 		awk '\$0 !~ "\\tNA\\t" {print}' |\\
@@ -584,7 +583,7 @@ process rrblup_fine_maps {
 
         	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
         	echo "\$ld_file"
-            Rscript --vanilla $PWD/bin/Finemap_QTL_Intervals.R ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
+            Rscript --vanilla "$PWD/bin/Finemap_QTL_Intervals.R" ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
         done   
 
 	"""
@@ -604,7 +603,7 @@ process concatenate_LD_per_trait {
 		set val(TRAIT), file(phenotype), file(roi_geno_matrix), file(processed_ld) from concat_ld_out
 
 	output:
-		set file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype) into combined_ld_data
+		set val(TRAIT), file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype) into combined_ld_data
 
 	"""
 		for i in *prLD_df.tsv;
@@ -642,7 +641,7 @@ genes
 process plot_genes {
 
 	cpus 1
-	memory '32 GB'
+	memory '10 GB'
 
 	tag {phenotype}
 
@@ -650,13 +649,13 @@ process plot_genes {
 	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*snpeff_genes.tsv"
 
 	input:
-		set file(genes), file(ld), file(phenotype), file(vcf), file(vcfindex) from plot_fine_map_genes
+		set file(genes), val(TRAIT), file(ld), file(phenotype), file(vcf), file(vcfindex) from plot_fine_map_genes
 
 	output:
-		set file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
+		set val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
 
 	"""
-		Rscript --vanilla $PWD/bin/plot_genes.R ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
+		Rscript --vanilla "$PWD/bin/plot_genes.R" ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
 	"""
 }
 
@@ -693,7 +692,7 @@ process burden_mapping {
 		set val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc") into burden_results
 
 	"""
-		Rscript --vanilla $PWD/bin/makeped.R ${trait_df}
+		Rscript --vanilla "$PWD/bin/makeped.R" ${trait_df}
 
 		n_strains=`wc -l ${trait_df} | cut -f1 -d" "`
 		min_af=`bc -l <<< "${params.minburden}/(\$n_strains-1)"`
@@ -723,12 +722,62 @@ process plot_burden {
 		set val(TRAIT), file(skat), file(vt) from burden_results
 
 	output:
-		set file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
+		set val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
 
 	"""
-		Rscript --vanilla $PWD/bin/plot_burden.R ${TRAIT} ${skat} ${vt}
+		Rscript --vanilla "$PWD/bin/plot_burden.R" ${TRAIT} ${skat} ${vt}
 	"""
 }
+
+
+
+/*
+====================================
+~ > *                          * < ~
+~ ~ > *                      * < ~ ~
+~ ~ ~ > * RMD HTML REPORT  * < ~ ~ ~
+~ ~ > *                      * < ~ ~
+~ > *                          * < ~
+====================================
+*/
+
+/*
+------ Create input channel that monitors whether previous processes are finished
+------ plot_burden only generate plots, but plot_genes writes out a table the .rmd needs. so wait for both process to finish.
+*/
+
+gene_plts
+	.join(burden_plots)
+	.set{html_input}
+
+
+process html_report {
+
+	executor 'local'
+
+	tag {TRAIT}
+
+	publishDir "${params.out}", mode: 'copy', pattern: "*.Rmd"
+	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
+
+	input:
+		set val(TRAIT), file(a), file(b), file(c), file(d) from html_input
+
+	output:
+		set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into html_rmd_report
+
+
+	"""
+		cat "$PWD/bin/cegwas2_report.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}.Rmd 
+
+		Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}.Rmd', knit_root_dir='$PWD/${params.out}')"
+
+	"""
+
+}
+
+
+
 
 
 /*
