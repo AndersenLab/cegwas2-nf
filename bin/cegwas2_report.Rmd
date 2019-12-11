@@ -8,8 +8,11 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 ## need to replace my notes with actual report information for users.
 
 1. This R Markdown file should be able to find all data tables and knit out of the box.
+<br>
 2. It will generate plots (almost) identical to the plots in Analysis folder.
+<br>
 3. ggsave code is kept for users to make customized plots. 
+<br>
 
 
 ```{r global_options, include=FALSE}
@@ -48,7 +51,7 @@ independent_test_cutoff <- -log10(0.05/independent_tests)
 
 ## Manhatton plot
 
-```{r, echo=FALSE, fig.height=4, fig.width=10, out.height=360, out.width=900}
+```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
 # load processed mapping data. 
 # Note that readr::read_delim will throw parsing errors and put NA in rows that contain actual values in strain/value/allele/var.exp so did not use it
 processed_mapping <- read.delim(paste0("Mappings/Data/",trait_name,"_processed_mapping.tsv"), stringsAsFactors=FALSE)
@@ -166,6 +169,7 @@ for (n in 1:nrow(QTL_peaks)) {
     
     ############## phenotype-genotype plot from Run_Mapping.R
     pxg_df <- na.omit(processed_mapping) %>% dplyr::filter(CHROM==QTL_peaks[n, "Chrom"], peakPOS==QTL_peaks[n, "Peak"]) %>%  # probably the na.omit is not needed any more
+        group_by(allele) %>%
         dplyr::mutate(mean_pheno = mean(as.numeric(value), na.rm = T)) 
     
     
@@ -214,15 +218,15 @@ for (n in 1:nrow(QTL_peaks)) {
     
     peak_roi_marker <- dplyr::filter(pr_roi_ld, POS == QTL_peaks[n, "Peak"])
     
-    ld_plot <- pr_roi_ld %>% na.omit() %>% ggplot() +
+    ld_plot <- pr_roi_ld %>% ggplot() +
         aes(x = POS/1e6, label_plotly_ld = marker) +
-        geom_point(aes(fill = ld_r2, y = value), shape = 23, size = 2) +
+        geom_point(aes(color = ld_r2, y = value), shape = 17, size = 2) +
         geom_point(data = peak_roi_marker, aes(y = value), shape = 23, size = 2, fill = "red") +
-        scale_fill_viridis_c(name = "R2") +
+        scale_color_viridis_c(name = "R2") +
         theme_bw(15)+
         labs(x = "Genomic Position (Mb)",
              y = "-log[10]p")
-    # note the color of ld_plot is different in the saved plot and in html output. I couldn't get plotly to carry over the color set by ggplot
+    # need to write out a separate plot with stroke around diamond points
     
     
     # save plot to file
@@ -232,14 +236,13 @@ for (n in 1:nrow(QTL_peaks)) {
     # 
     
     # store plot for html output
-    # ggplotly will change the fill color... open bug https://github.com/ropensci/plotly/issues/907
-    # so remove the legend to be less confusing
+    # cannot get plotly to work with fill with continuous scale, so use a shape with no stroke(color)/fill distinction.
     plotly_plot_list[[2+(n-1)*2]] <- hide_colorbar(ggplotly(ld_plot, tooltip = c("label_plotly_ld", "y"))) 
 }
 
 
 # show plot in html output
-plotly::subplot(plotly_plot_list, shareY = FALSE, titleX = TRUE, titleY = TRUE, nrows = n, margin=0.1, widths=c(0.3, 0.7)) 
+plotly::subplot(plotly_plot_list, shareY = FALSE, titleX = TRUE, titleY = TRUE, nrows = n, margin=0.05, widths=c(0.3, 0.7)) 
 ```
 
 
@@ -248,7 +251,7 @@ plotly::subplot(plotly_plot_list, shareY = FALSE, titleX = TRUE, titleY = TRUE, 
 
 ## Gene plot for each peak region (should make interactive to show gene name?)
 
-```{r, echo=FALSE, fig.height=5, fig.width=8, out.height=500, out.width=800}
+```{r, echo=FALSE, fig.height=5, fig.width=10, out.height=500, out.width=1000}
 # read in data table 
 tidy_genes_in_region <- read.delim(paste0("Fine_Mappings/Data/", trait_name, "_snpeff_genes.tsv"), stringsAsFactors=FALSE)
 
@@ -324,7 +327,7 @@ for(r in 1:length(unique(tidy_genes_in_region$QTL_INTERVAL_START))){
 
 ## Burden mapping plots
 
-```{r, echo=FALSE, fig.height=4, fig.width=10, out.height=360, out.width=900}
+```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
 # plots from plot_burden.R
 # Plot SKAT
 skat <- read.delim(paste0("BURDEN/SKAT/Data/", trait_name, ".Skat.assoc"), stringsAsFactors=FALSE) %>%
