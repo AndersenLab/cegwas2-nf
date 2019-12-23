@@ -139,9 +139,9 @@ manhattan_plot
 # read in peaks for all traits, quit knitting if there are no significant peaks for this trait
 # if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
-if (file.info("Mappings/Data/QTL_peaks_2row.tsv")$size!=0) {
+if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
     
-    QTL_peaks <- read.delim("Mappings/Data/QTL_peaks_2row.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
+    QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
         dplyr::filter(V1==trait_name)  %>% rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5)
     
     # define size of plot based on number of peaks
