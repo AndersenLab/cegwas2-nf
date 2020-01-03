@@ -4,14 +4,22 @@ output: html_document
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 ---
 
-
-## need to replace my notes with actual report information for users.
-
-1. This R Markdown file should be able to find all data tables and knit out of the box.
 <br>
-2. It will generate plots (almost) identical to the plots in Analysis folder.
+
+## Usage
+
+* This R Markdown file imports data tables within Analysis_Results-Date folder and will knit without any modification.
 <br>
-3. ggsave code is kept for users to make customized plots. 
+* It generates plots (almost) identical to the plots in Analysis_Results-Date folder.
+<br>
+* Features for the interactive plots: 
+* Put mouse on plot region to show related underlying data.
+* Hold and drag the mouse to select a region to zoom in, double click to reset zoom.
+* Click on legend to show/hide different data groups.
+<br>
+* ggsave code is kept for users to make customized plots. 
+<br>
+<br>
 <br>
 
 
@@ -43,7 +51,7 @@ require(DT) || install.packages("DT")
 # load trait name
 # in nextflow use sed to edit this field and make a copy of the .rmd for each trait
 trait_name="TRAIT_NAME_HOLDER"   
-#trait_name="PC1"
+# trait_name="PC1"
 
 # load independent tests result
 total_independent_tests <- read.table("Genotype_Matrix/total_independent_tests.txt", quote="\"", comment.char="", stringsAsFactors=FALSE)
@@ -55,17 +63,14 @@ independent_test_cutoff <- -log10(0.05/independent_tests)
 ```
 
 
-<br>
-<br>
-
 ## Manhatton plot
-* #### Every dot is a SNV marker (??).
+* #### Every dot is a SNV marker.
 
-* #### Red/pink dots are significant QTL loci based on defined thresholds. Red is BF or user supplied cutoff: default BF -log10(p) > 6. Pink is Eigen cutoff: -log10(0.05/independent_tests) 
-<br>
-where "independent_tests" is calculated from Eigen Decomposition of SNV correlation matrix, stored in Analysis_Results-date/⁩Genotype_Matrix/total_independent_tests.txt
+* #### Red/pink dots are significant QTL loci based on defined thresholds. 
+    * Red is BF or user supplied cutoff: default BF -log10(p) > 6. 
+    * Pink is Eigen cutoff: -log10(0.05/independent_tests) where "independent_tests" is calculated from Eigen Decomposition of SNV correlation matrix, stored in Analysis_Results-date/⁩Genotype_Matrix/total_independent_tests.txt
 
-* #### Light blue regions are QTL intervals that contain markers significantly associate with the trait. This is the region that will be shown in the pheno-geno, fine mapping and gene plots below. 
+* #### Light blue regions are QTL intervals that contain markers significantly associate with the trait. This is the region that will be shown in the phenotype-genotype, fine mapping and gene plots below. 
 
 
 ```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
@@ -143,34 +148,33 @@ manhattan_plot
 
 
 ```{r echo=FALSE}
-# read in peaks for all traits, quit knitting if there are no significant peaks for this trait
-# note that QTL_peaks.tsv is generated even if there is no significant peaks
+# read in QTL regions for all traits. Note that QTL_peaks.tsv is generated even if there is no significant regions.
+# based on number of regions & width of regions to decide whether generate pxg and fine mapping plots
 
 if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
-#if (file.info("Mappings/Data/QTL_peaks_2row.tsv")$size!=0) {
+# if (file.info("Mappings/Data/QTL_peaks_2row.tsv")$size!=0) {
     
     QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
         dplyr::filter(V1==trait_name)  %>% 
-        dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) %>% 
-        dplyr::mutate(Region_width=Region_end - Region_start) %>% 
-        dplyr::filter(Region_width < 1500000)
+        dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) 
     
     if (nrow(QTL_peaks)==0) {
-        
-        print("All QTL peaks are too wide for plotting")
-        
-        whether_fine_map = FALSE
+        print("No significant QTL region for this trait")
+        whether_fine_map = FALSE # skip related chunks
         
     } else {
+        QTL_peaks <- dplyr::mutate(QTL_peaks, Region_width=Region_end - Region_start) %>% dplyr::filter(Region_width < 1500000)
         
-        # define size of plot based on number of peaks
-        plot_height_all_peaks = 350*nrow(QTL_peaks) 
-        
-        # set parameter to run all fine-mapping related chuncks
-        whether_fine_map = TRUE
-    }    
-    
+        if (nrow(QTL_peaks)==0) {
+            print("Significant QTL regions are too wide for plotting")
+            whether_fine_map = FALSE # skip related chunks
+            
+        } else {
+            whether_fine_map = TRUE # run related chunks
+            
+        }
+    }
     
 } else { 
     print("No significant peak for this trait")
@@ -190,13 +194,13 @@ DT::datatable(QTL_peaks)
 <br>
 <br>
 
-## Interactive pxgplot, fine mapping plot, gene plot for each peak region
-* #### Select an area to zoom in, double click anywhere on the plot to reset zoom.
-* #### the snpeff table is too long. group by marker???
-```{r echo=FALSE, out.height=500, out.width=1000, eval=whether_fine_map}
+## For each QTL region:
+```{r echo=FALSE, eval=whether_fine_map}
 # first create a list to put plotly plots and DT tables since they cannot be directly printed within for loops in r markdown
 # plotly_pxg_fine_list <- htmltools::tagList()
-plotly_pxg_fine_list <- list()
+# plotly_pxg_fine_list <- list()
+plotly_pxg_plot_list <- list()
+plotly_fine_plot_list <- list()
 DT_gene_list <- list()
 plotly_gene_plot_list <- list()
 
@@ -220,7 +224,9 @@ if (length(unique(tidy_genes_in_region$QTL_INTERVAL_START)) != nrow(QTL_peaks)) 
 # For each peak, make 1 row of plots  
 for (n in seq_len(nrow(QTL_peaks))) {
     
-    peak_name = paste0(QTL_peaks[n, "Trait"],".",QTL_peaks[n, "Chrom"],".",QTL_peaks[n, "Region_start"],".",QTL_peaks[n, "Region_end"])
+    QTL_peak = paste0(QTL_peaks[n, "Trait"],".",QTL_peaks[n, "Chrom"],".",QTL_peaks[n, "Peak"])
+    
+    QTL_region = paste0(QTL_peaks[n, "Trait"],".",QTL_peaks[n, "Chrom"],".",QTL_peaks[n, "Region_start"],"-",QTL_peaks[n, "Region_end"])
     
     ############## phenotype-genotype plot from Run_Mapping.R
     pxg_df <- na.omit(processed_mapping) %>% # probably the na.omit is not needed any more
@@ -251,18 +257,19 @@ for (n in seq_len(nrow(QTL_peaks))) {
               axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
               strip.text.x = element_text(size = 14, face = "bold"))+
         theme(legend.position = "none") +
-        ggtitle(peak_name)
+        ggtitle(QTL_peak)
     
     
     # save plot to file
-    # ggsave(pxg_plot, filename = paste0(peak_name, "_pxgplot.pdf"),
+    # ggsave(pxg_plot, filename = paste0(QTL_peak, "_pxgplot.pdf"),
     #        height = 4, 
     #        width = 4, limitsize = FALSE)
     
     
     # store plot for html output
-    plotly_pxg_fine_list[[1+(n-1)*2]] <- ggplotly(pxg_plot, tooltip = c("plotly_label", "y"))
-    
+    #plotly_pxg_fine_list[[1+(n-1)*2]] <- ggplotly(pxg_plot, tooltip = c("plotly_label", "y"))
+    plotly_pxg_plot_list[[n]] <- ggplotly(pxg_plot, tooltip = c("plotly_label", "y")) %>%
+        layout(autosize = F, width = 300, height = 400)
     
     
     #################### Generate fine mapping plots from Finemap_QTL_Intervals.R
@@ -279,23 +286,24 @@ for (n in seq_len(nrow(QTL_peaks))) {
         aes(x = POS/1e6, plotly_label_ld = marker) +
         geom_point(aes(color = ld_r2, y = value), shape = 17, size = 2) +
         geom_point(data = peak_roi_marker, aes(y = value), shape = 23, size = 2, fill = "red") +
-        scale_color_viridis_c(name = "R2") +
+        scale_color_viridis_c(name = "LD R^2") +
         theme_bw(15)+
         labs(x = "Genomic Position (Mb)",
-             y = "-log[10]p")
+             y = "-log[10]p") +
+        ggtitle(QTL_region)
     # need to write out a separate plot with stroke around diamond points
     
     
     # save plot to file
-    # ggsave(ld_plot, filename = paste0(peak_name, "_finemap_plot.pdf"),
+    # ggsave(ld_plot, filename = paste0(QTL_peak, "_finemap_plot.pdf"),
     #        height = 4,
     #        width = 12)
     # 
     
     # store plot for html output
     # cannot get plotly to work with fill with continuous scale, so use a shape with no stroke(color)/fill distinction.
-    plotly_pxg_fine_list[[2+(n-1)*2]] <- hide_colorbar(ggplotly(ld_plot, tooltip = c("plotly_label_ld", "y"))) 
-    
+    # plotly_pxg_fine_list[[2+(n-1)*2]] <- hide_colorbar(ggplotly(ld_plot, tooltip = c("plotly_label_ld", "y"))) 
+    plotly_fine_plot_list[[n]] <- ggplotly(ld_plot, tooltip = c("plotly_label_ld", "y"))
     
     
     
@@ -375,7 +383,7 @@ for (n in seq_len(nrow(QTL_peaks))) {
         theme(legend.position = "top",
               panel.grid = element_blank())
     
-
+    
     # save plot to file
     # ggsave(gene_plot,
     #       filename = paste0(trait_name, ".", gc, ".",  xs, ".", xe, "_gene_plot.pdf"),
@@ -395,8 +403,6 @@ for (n in seq_len(nrow(QTL_peaks))) {
 ```
 
 
-Need to plot the plotly_plot in a row, then the gene plot, then the table. all in htmlwidgets probably. should do all in 1 loop. 
-
 <br>
 <br>
 
@@ -413,14 +419,23 @@ DT::datatable(matrix())
 
 ```{r, results='asis', eval=whether_fine_map}
 for (i in seq_len(nrow(QTL_peaks))) {
+    
     cat("\n\n")
-    print(htmltools::tagList(plotly::subplot(plotly_pxg_fine_list[[2*i-1]], plotly_pxg_fine_list[[2*i]], shareY = FALSE, titleX = TRUE, titleY = TRUE, nrows = 1, margin=0.05, widths=c(0.3, 0.7)))) 
+    cat("\n##Phenotype-genotype plot for the peak SNV marker\n")
+    print(htmltools::tagList(plotly_pxg_plot_list[[i]]))
     cat("\n\n")
     
-    cat("\nClick on legend to hide/show certain groups\n")
+    cat("\n##Fine mapping plot for the QTL region\n")
+    print(htmltools::tagList(plotly_fine_plot_list[[i]]))
+    cat("\n\n")
+    
+    cat("\n\n")
+    cat("\n##Gene plot for the QTL region\n")
+    cat("\n\n")
+    
     print(htmltools::tagList(plotly_gene_plot_list[[i]]))
-    cat("\n\n")
     
+    cat("\n\n")
     print(htmltools::tagList(DT_gene_list[[i]]))
     cat("\n\n")
 }
@@ -430,7 +445,7 @@ for (i in seq_len(nrow(QTL_peaks))) {
 
 ## Burden mapping plots
 
-* #### Every dot represents a gene (???)
+* #### Every dot represents a gene, red color indicates significant based on corresponding test.
 * #### SKAT
 ```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
 # plots from plot_burden.R
@@ -487,6 +502,8 @@ skat_link = filter(skat, significant == TRUE) %>%
 DT::datatable(skat_link, escape = FALSE)
 ```
 
+<br>
+<br>
 
 * #### Variable Threshold
 ```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
