@@ -16,12 +16,13 @@ params.minburden = 2
 params.refflat   = "bin/refFlat.ws245.txt"
 params.genes     = "bin/gene_ref_flat.Rda"
 params.cendr_v   = "20180527"
-params.e_mem 	 = "100"
+params.e_mem 	 = "10"
 params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
 params.ci_size   = 150
 params.fix_names = "fix"
 params.help 	 = null
+params.R_libpath="/projects/b1059/software/R_lib_3.4.1"
 
 println()
 
@@ -70,6 +71,7 @@ if (params.help) {
     log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
     log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
+    log.info "--R_libpath                  String                Path to the required R libraries (DEFAULT = /projects/b1059/software/R_lib_3.4.1)"
     log.info ""
     log.info "--------------------------------------------------------"
     log.info "Information describing the stucture of the input files can be located in input_files/README.txt"
@@ -87,7 +89,6 @@ if (params.help) {
     log.info "R-tidyverse            v1.2.1"
     log.info "R-correlateR           Found on GitHub"
     log.info "R-rrBLUP               v4.6"
-    log.info "R-sommer               v3.5"
     log.info "R-RSpectra             v0.13-1"
     log.info "R-ggbeeswarm           v0.6.0"
     log.info "--------------------------------------------------------"    
@@ -105,6 +106,7 @@ log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Gene File                               = ${params.genes}"
 log.info "Result Directory                        = ${params.out}"
 log.info "Eigen Memory allocation                 = ${params.eigen_mem}"
+log.info "Path to R libraries.                    = ${params.R_libpath}"
 log.info ""
 }
 
@@ -195,6 +197,8 @@ Channel
 	.fromPath("${params.traitfile}")
 	.set{ traits_to_strainlist }
 
+
+
 process fix_strain_names_bulk {
 
 	executor 'local'
@@ -209,7 +213,10 @@ process fix_strain_names_bulk {
 		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
 
 	"""
-		Rscript --vanilla "${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R" ${phenotypes}
+		# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
+		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
+
+		Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names}
 	"""
 
 }
@@ -325,7 +332,10 @@ process chrom_eigen_variants {
 	"""
 		cat Genotype_Matrix.tsv |\\
 		awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
-		Rscript --vanilla "${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R" ${CHROM}_gm.tsv ${CHROM}
+
+		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R > Get_GenoMatrix_Eigen.R
+
+		Rscript --vanilla Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
 	"""
 
 }
@@ -403,7 +413,9 @@ process rrblup_maps {
 	"""
 		tests=`cat independent_snvs.csv | grep -v inde`
 
-		Rscript --vanilla "${workflow.projectDir}/bin/Run_Mappings.R" ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
+	  echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Run_Mappings.R > Run_Mappings.R
+
+    Rscript --vanilla Run_Mappings.R ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
 
 		if [ -e Rplots.pdf ]; then
     		rm Rplots.pdf
@@ -593,7 +605,10 @@ process rrblup_fine_maps {
 
         	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
         	echo "\$ld_file"
-            Rscript --vanilla "${workflow.projectDir}/bin/Finemap_QTL_Intervals.R" ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
+
+          echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Finemap_QTL_Intervals.R > Finemap_QTL_Intervals.R
+          
+          Rscript --vanilla Finemap_QTL_Intervals.R ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
         done   
 
 	"""
@@ -665,7 +680,9 @@ process plot_genes {
 		set val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
 
 	"""
-		Rscript --vanilla "${workflow.projectDir}/bin/plot_genes.R" ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_genes.R > plot_genes.R
+    
+    Rscript --vanilla plot_genes.R ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
 	"""
 }
 
@@ -702,7 +719,9 @@ process burden_mapping {
 		set val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc") into burden_results
 
 	"""
-		Rscript --vanilla "${workflow.projectDir}/bin/makeped.R" ${trait_df}
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/makeped.R > makeped.R
+    
+    Rscript --vanilla makeped.R ${trait_df}
 
 		n_strains=`wc -l ${trait_df} | cut -f1 -d" "`
 		min_af=`bc -l <<< "${params.minburden}/(\$n_strains-1)"`
@@ -735,7 +754,9 @@ process plot_burden {
 		set val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
 
 	"""
-		Rscript --vanilla "${workflow.projectDir}/bin/plot_burden.R" ${TRAIT} ${skat} ${vt}
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_burden.R > plot_burden.R
+
+    Rscript --vanilla plot_burden.R ${TRAIT} ${skat} ${vt}
 	"""
 }
 
@@ -779,6 +800,8 @@ process html_report {
 
 	"""
 		cat "${workflow.projectDir}/bin/cegwas2_report.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}.Rmd 
+
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
 
 		Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
 
