@@ -16,7 +16,6 @@ GWA mapping with C. elegans
 1. [R-tidyverse-v1.2.1](https://www.tidyverse.org/)
 1. [R-correlateR](https://github.com/AEBilgrau/correlateR)
 1. [R-rrBLUP-v4.6](https://cran.r-project.org/web/packages/rrBLUP/rrBLUP.pdf)
-1. [R-sommer-v3.5](https://cran.r-project.org/web/packages/sommer/sommer.pdf)
 1. [R-RSpectra-v0.13-1](https://github.com/yixuan/RSpectra)
 1. [R-ggbeeswarm-v0.6](https://github.com/eclarke/ggbeeswarm)
 
@@ -56,6 +55,8 @@ nextflow main.nf --traitfile=test_traits.tsv --vcf=bin/WI.20180527.impute.vcf.gz
 * `--refflat` - Genomic locations for genes used for burden mapping. A default generated from WS245 is provided in the repositories bin. 
 
 * `--genes` - Genomic locations for genes formatted for plotting purposes. A default generated from WS245 is provided in the repositories bin.
+
+* `--fix_names` - This will query the CeNDR strain set an resolve any discrepancies between your strain set and isotype names on CeNDR. This is important if you are not providing your own VCF, however if you provide your own VCF that contains the strains you phenotyped, you do not need to fix strain names (Default = "fix", change to anything but fix to skip).
 
 ### R scripts
 
