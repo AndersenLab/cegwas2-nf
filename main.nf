@@ -232,6 +232,9 @@ phenotyped_strains_to_analyze
 	.into{strain_list_genome;
 		  strain_list_finemap}
 
+
+
+
 process vcf_to_geno_matrix {
 
 	executor 'local'
@@ -246,7 +249,6 @@ process vcf_to_geno_matrix {
 
 	output:
 		file("Genotype_Matrix.tsv") into geno_matrix
-    file("LD_between_QTL_regions.tsv") into linkage_table
 
 	"""
 
@@ -288,17 +290,14 @@ process vcf_to_geno_matrix {
 		sed 's/1\\/0/NA/g' |\\
 		sed 's/.\\/./NA/g' > Genotype_Matrix.tsv
 
-
-    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
-
-    Rscript --vanilla LD_between_regions.R "Genotype_Matrix.tsv"
 	"""
 
 }
 
 geno_matrix
 	.into{eigen_gm;
-		  mapping_gm}
+		  mapping_gm;
+      linkage_gm}
 
 
 /*
@@ -428,6 +427,41 @@ process rrblup_maps {
 	"""
 }
 
+
+
+pr_maps_trait
+  .into{pr_maps_trait1 ; pr_maps_trait2}
+
+
+/*
+------------ Generate linkage plot between QTL regions
+*/
+
+process LD_between_regions{
+
+  tag { TRAIT }
+
+  publishDir "${params.out}/Mappings/Data", mode: 'copy'
+
+  input:
+  set val(TRAIT), file("processed_mapping.tsv") from pr_maps_trait1
+  file("Genotype_Matrix.tsv") from linkage_gm
+
+  output:
+  set val(TRAIT), file("*LD_between_QTL_regions.tsv") optional true into linkage_table
+
+
+  """
+
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
+
+    Rscript --vanilla LD_between_regions.R Genotype_Matrix.tsv processed_mapping.tsv ${TRAIT}
+
+  """
+}
+
+
+
 /*
 ------------ Generate GWAS QTL summary plot
 */
@@ -449,7 +483,9 @@ process summarize_maps {
 
 
 	"""
-		Rscript --vanilla "${workflow.projectDir}/bin/Summarize_Mappings.R"
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Summarize_Mappings.R > Summarize_Mappings.R 
+		
+    Rscript --vanilla Summarize_Mappings.R
 
 		cat *processed_mapping.tsv |\\
 		awk '\$0 !~ "\\tNA\\t" {print}' |\\
@@ -466,14 +502,17 @@ process summarize_maps {
 	"""
 }
 
-
 qtl_peaks
+  .into{qtl_peaks1 ; qtl_peaks2}
+
+
+qtl_peaks1
    .splitCsv(sep: '\t')
-   .into{peaks;printpeaks}
+   .into{peaks ; printpeaks ; html_report_peaks1 ; html_report_peaks2 }
 
 peaks
    .join(processed_map_to_ld)
-   .join(pr_maps_trait)
+   .join(pr_maps_trait2)
    .spread(vcf_to_fine_map)
    .spread(strain_list_finemap)
    .into{QTL_peaks; QTL_peaks_print}
@@ -771,23 +810,99 @@ process plot_burden {
 ====================================
 ~ > *                          * < ~
 ~ ~ > *                      * < ~ ~
-~ ~ ~ > * RMD HTML REPORT  * < ~ ~ ~
+~ ~ ~ > * CREATE HTML REPORT  * < ~ ~ ~
 ~ ~ > *                      * < ~ ~
 ~ > *                          * < ~
 ====================================
 */
 
 /*
------- Create input channel that monitors whether previous processes are finished
------- plot_burden only generate plots, but plot_genes writes out a table the .rmd needs. so wait for both process to finish.
+------ Create main report regardless of whether any significant QTL regions exist
+*/
+
+/*    Recall that:
+set val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots 
+set val(TRAIT), file("*LD_between_QTL_regions.tsv") into linkage_table
+*/
+
+
+burden_plots
+  .join(linkage_table)
+  .set{input_for_main}
+
+
+process html_report_main {
+
+  executor 'local'
+
+  tag {TRAIT}
+
+  publishDir "${params.out}", mode: 'copy'
+
+
+  input:
+    set val(TRAIT), file(a), file(b), file(c) from input_for_main
+
+  output:
+    set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into report_main
+
+
+  """
+    cat "${workflow.projectDir}/bin/cegwas2_report_main.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}_main.Rmd 
+
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+
+    Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_main.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
+
+  """
+}
+
+
+
+/*
+------ Slice out the QTL region for plotting divergent region and haplotype data.
+*/
+
+
+process html_region_prep_table {
+
+  executor 'local'
+
+  publishDir "${params.out}/Divergent_and_haplotype", mode: 'copy'
+
+
+  input:
+    file("QTL_peaks.tsv") from qtl_peaks2
+  output:
+    set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_strain_list.txt") into div_hap_table
+
+
+  """
+  cat QTL_peaks.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
+
+  bedtools intersect -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed > all_QTL_bins.bed
+
+  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed > all_QTL_div.bed
+
+  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo > haplotype_in_QTL_region.txt
+
+  cp ${workflow.projectDir}/bin/div_strain_list.txt . 
+
+  """
+
+}
+
+
+/*
+------ Create report for each significant QTL region.
 */
 
 gene_plts
-	.join(burden_plots)
-	.set{html_input}
+  .join(html_report_peaks2)
+  .set{input_for_region}
 
 
-process html_report {
+process html_report_region {
 
 	executor 'local'
 
@@ -797,23 +912,25 @@ process html_report {
 	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
 
 	input:
-		set val(TRAIT), file(a), file(b), file(c), file(d) from html_input
+    set val(TRAIT), file(a), file(b), val(CHROM), val(start_pos), val(peak_pos), val(end_pos) from input_for_region
+    set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_strain_list.txt") from div_hap_table
+
 
 	output:
-		set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into html_rmd_report
+		set file("cegwas2_report_region_*.Rmd"), file("cegwas2_report_region_*.html") into html_rmd_report
 
 
 	"""
-		cat "${workflow.projectDir}/bin/cegwas2_report.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}.Rmd 
+
+		cat "${workflow.projectDir}/bin/cegwas2_report_region.Rmd" | sed -e "s/TRAIT_NAME_HOLDER/${TRAIT}/g" -e "s/QTL_CHROM_HOLDER/${CHROM}/g" -e "s/QTL_REGION_START_HOLDER/${start_pos}/g" -e "s/QTL_PEAK_HOLDER/${peak_pos}/g" -e "s/QTL_REGION_END_HOLDER/${end_pos}/g" > cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd 
 
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
 
-		Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
+		Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
 
 	"""
 
 }
-
 
 
 
