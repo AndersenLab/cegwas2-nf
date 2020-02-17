@@ -246,6 +246,7 @@ process vcf_to_geno_matrix {
 
 	output:
 		file("Genotype_Matrix.tsv") into geno_matrix
+    file("LD_between_QTL_regions.tsv") into LD_regions
 
 	"""
 
@@ -287,6 +288,10 @@ process vcf_to_geno_matrix {
 		sed 's/1\\/0/NA/g' |\\
 		sed 's/.\\/./NA/g' > Genotype_Matrix.tsv
 
+
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
+
+    Rscript --vanilla LD_between_regions.R Genotype_Matrix.tsv
 	"""
 
 }
