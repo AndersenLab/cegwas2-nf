@@ -238,7 +238,7 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     alt_count = data.frame(table(ref_alt$allele)) %>% filter(Var1==1)
     ref_count = data.frame(table(ref_alt$allele)) %>% filter(Var1==-1)
     
-    ref_alt %<>% mutate(geno_group = ifelse(allele==1, "ALT", "REF"))  %>% mutate(geno_group_count = ifelse(allele==1, paste0("ALT(", alt_count[1,2], ")"), paste0("REF(", ref_count[1,2], ")"))) %>% select(-allele)
+    ref_alt = mutate(ref_alt, geno_group = ifelse(allele==1, "ALT", "REF"))  %>% mutate(geno_group_count = ifelse(allele==1, paste0("ALT(", alt_count[1,2], ")"), paste0("REF(", ref_count[1,2], ")"))) %>% select(-allele)
     
     # make sure REF/ALT annotation is in the same order as row.names(m2)
     # that's how complexHeatmap combine them
@@ -248,7 +248,7 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     # add div and write out table
     # this corresponds to the sort order of rows for heatmap
     peak_bin = floor(QTL_Peak/1000)*1000
-    ref_alt_annotation %<>% mutate(is_div = m2[strain, as.character(peak_bin)])
+    ref_alt_annotation = mutate(ref_alt_annotation, is_div = m2[strain, as.character(peak_bin)])
     
   #  write.table(ref_alt_annotation, paste0("strain_ref_alt_div_annotation_", QTL_peaks[n, "Chrom"], ".", QTL_peaks[n, "Peak"], ".txt"), sep="\t", quote=F, row.names = F, col.names = T)
     
@@ -369,7 +369,7 @@ names(haplotype_in_QTL_region) = c("chromosome", "start", "stop", "haplotype", "
 
     ########## add new plotpoint back to plot_df 
     
-    plot_df %<>% inner_join(plot_df_sort_order, by="isotype")
+    plot_df = inner_join(plot_df, plot_df_sort_order, by="isotype")
 
     ########## relevel REF/ALT
     
