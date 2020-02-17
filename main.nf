@@ -246,7 +246,7 @@ process vcf_to_geno_matrix {
 
 	output:
 		file("Genotype_Matrix.tsv") into geno_matrix
-    file("LD_between_QTL_regions.tsv") into LD_regions
+    file("LD_between_QTL_regions.tsv") into linkage_table
 
 	"""
 
@@ -291,7 +291,7 @@ process vcf_to_geno_matrix {
 
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
 
-    Rscript --vanilla LD_between_regions.R Genotype_Matrix.tsv
+    Rscript --vanilla LD_between_regions.R "Genotype_Matrix.tsv"
 	"""
 
 }
