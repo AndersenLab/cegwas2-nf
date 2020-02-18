@@ -430,8 +430,11 @@ process rrblup_maps {
 
 
 pr_maps_trait
-  .into{pr_maps_trait1 ; pr_maps_trait2}
+  .into{ pr_maps_trait1 ; pr_maps_trait2 }
 
+pr_maps_trait1
+  .combine(linkage_gm)
+  .set{ linkage_input }
 
 /*
 ------------ Generate linkage plot between QTL regions
@@ -441,15 +444,14 @@ process LD_between_regions{
 
   tag { TRAIT }
 
-  publishDir "${params.out}/Mappings/Data", mode: 'copy'
+  publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*LD_between_QTL_regions.tsv"
 
   input:
-  set val(TRAIT), file("processed_mapping.tsv") from pr_maps_trait1
-  file("Genotype_Matrix.tsv") from linkage_gm
+  set val(TRAIT), file("processed_mapping.tsv"), file("Genotype_Matrix.tsv") from linkage_input
 
   output:
   set val(TRAIT), file("*LD_between_QTL_regions.tsv") optional true into linkage_table
-
+  val(TRAIT) into linkage_done
 
   """
 
@@ -822,13 +824,13 @@ process plot_burden {
 
 /*    Recall that:
 set val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots 
-set val(TRAIT), file("*LD_between_QTL_regions.tsv") into linkage_table
+val(TRAIT) into linkage_done
 */
 
 
 burden_plots
-  .join(linkage_table)
-  .set{input_for_main}
+  .join(linkage_done)
+  .set{ input_for_main }
 
 
 process html_report_main {
@@ -841,7 +843,7 @@ process html_report_main {
 
 
   input:
-    set val(TRAIT), file(a), file(b), file(c) from input_for_main
+    set val(TRAIT), file(a), file(b) from input_for_main
 
   output:
     set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into report_main
@@ -874,7 +876,7 @@ process html_region_prep_table {
   input:
     file("QTL_peaks.tsv") from qtl_peaks2
   output:
-    set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_strain_list.txt") into div_hap_table
+    set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_isotype_list.txt") into div_hap_table
 
 
   """
@@ -886,7 +888,7 @@ process html_region_prep_table {
 
   bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo > haplotype_in_QTL_region.txt
 
-  cp ${workflow.projectDir}/bin/div_strain_list.txt . 
+  cp ${workflow.projectDir}/bin/div_isotype_list.txt . 
 
   """
 
@@ -917,7 +919,7 @@ process html_report_region {
 
 
 	output:
-		set file("cegwas2_report_region_*.Rmd"), file("cegwas2_report_region_*.html") into html_rmd_report
+		set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into html_rmd_report
 
 
 	"""

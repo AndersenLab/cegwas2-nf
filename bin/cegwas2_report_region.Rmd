@@ -161,7 +161,7 @@ tidy_genes_in_region <- read.delim(paste0("Fine_Mappings/Data/", trait_name, "_s
 
 ```{r}
 # check whether there are user tested strains that have no divergent region data
-div_strain_list <- read.delim("Divergent_and_haplotype/div_strain_list.txt", header=FALSE, stringsAsFactors=FALSE) 
+div_strain_list <- read.delim("Divergent_and_haplotype/div_isotype_list.txt", header=FALSE, stringsAsFactors=FALSE) 
 
 w_div_data_strain=inner_join(user_strain_pheno_list, div_strain_list, by=c("strain"="V1"))
 no_data_strain=anti_join(user_strain_pheno_list, div_strain_list, by=c("strain"="V1"))
@@ -256,14 +256,14 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     # decide whether there is enough strains with divergent region to split phenotype genotype plot
     if (nrow(filter(ref_alt_annotation, is_div == 1)) > nrow(ref_alt_annotation)/20 ) {
         split_by_div = TRUE
-    }
+    } else { split_by_div = FALSE }
     
     ######################### make the plot
     # set color for heatmap
     colors = structure(c("indianred1","grey90","dodgerblue3"), names = c("1", "0", "-1")) 
     
     # keep only existing groups for legend
-    legend_mapping = data.frame(div_group=c(0, 1, -1), div_label=c("not divergent", "div from N2", "no div data" )) %>% filter(div_group %in% unique(c(m2)))
+    legend_mapping = data.frame(div_group=c(0, 1, -1), div_label=c("not divergent", "divergent from N2", "no divergent data" )) %>% filter(div_group %in% unique(c(m2)))
     
     # create x-axis label
     x_axis_start = colnames(m2)[1]
@@ -332,7 +332,7 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
 ```{r, fig.width=20, fig.height=10}
 # if (file.info("all_QTL_div.bed")$size!=0) {
     
-    haplotype_in_QTL_region <- read.delim("Divergent_and_haplotype/haplotype_in_QTL_region.txt", header=FALSE, stringsAsFactors=FALSE) %>% select(-V27)
+    haplotype_in_QTL_region <- read.delim("Divergent_and_haplotype/haplotype_in_QTL_region.txt", header=FALSE, stringsAsFactors=FALSE) %>% select(-V13)
 
 names(haplotype_in_QTL_region) = c("chromosome", "start", "stop", "haplotype", "isotype", "plotpoint", "segment", "color", "color_new", "Chrom", "Region_start", "Region_end")
 

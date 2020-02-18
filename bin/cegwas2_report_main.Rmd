@@ -46,7 +46,7 @@ library("DT", lib.loc = library.path)
 
 
 
-```{r echo=FALSE}
+```{r}
 # load trait name
 # in nextflow use sed to edit this field and make a copy of the .rmd for each trait
 trait_name="TRAIT_NAME_HOLDER"   
@@ -72,7 +72,7 @@ independent_test_cutoff <- -log10(0.05/independent_tests)
 * #### Light blue regions are QTL intervals that contain markers significantly associate with the trait. These are the regions that will be shown in the phenotype-genotype, fine mapping and gene plots below. 
 
 
-```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
 # load processed mapping data. 
 # Note that readr::read_delim will throw parsing errors and put NA in rows that contain actual values in strain/value/allele/var.exp so did not use it
 processed_mapping <- read.delim(paste0("Mappings/Data/",trait_name,"_processed_mapping.tsv"), stringsAsFactors=FALSE)
@@ -146,27 +146,33 @@ manhattan_plot
 
 
 
-```{r echo=FALSE}
+```{r}
 # read in QTL regions for all traits. Note that QTL_peaks.tsv is generated even if there is no significant regions.
 # based on number of regions & width of regions to decide whether generate pxg and fine mapping plots
 
 if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
-# if (file.info("Mappings/Data/QTL_peaks_2row.tsv")$size!=0) {
-    
     QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
         dplyr::filter(V1==trait_name)  %>% 
         dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) 
     
+    
+    if (nrow(QTL_peaks) < 2) { 
+        whether_plot_LD = FALSE 
+        } else { whether_plot_LD = TRUE }
+    
+    
     if (nrow(QTL_peaks)==0) {
-        print("EXIT: No significant QTL region for this trait")
+        print("No significant QTL region for this trait")
         whether_fine_map = FALSE # skip related chunks
-        
+        whether_plot_LD = FALSE
     } else {
+
+
         QTL_peaks <- dplyr::mutate(QTL_peaks, Region_width=Region_end - Region_start) %>% dplyr::filter(Region_width < 1500000)
         
         if (nrow(QTL_peaks)==0) {
-            print("EXIT: Significant QTL regions are too wide for plotting")
+            print("Significant QTL regions are too wide for plotting")
             whether_fine_map = FALSE # skip related chunks
             
         } else {
@@ -176,7 +182,8 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
     }
     
 } else { 
-    print("EXIT: No significant peak for this trait")
+    print("No significant peak for this trait")
+    whether_plot_LD = FALSE
     whether_fine_map = FALSE
 }
 ```
@@ -194,8 +201,8 @@ DT::datatable(QTL_peaks)
 <br>
 
 ## Pair-wish linkage between QTL regions by R square
-```{r, fig.width=6, fig.height=4}
-ldcalc <- read.table(file = "Genotype_Matrix/LD_between_QTL_regions.tsv", header = T) %>% as.matrix()
+```{r, fig.width=6, fig.height=4, eval=whether_plot_LD}
+ldcalc <- read.table(file = paste0("Mappings/Data/", trait_name, "_LD_between_QTL_regions.tsv", header = T) %>% as.matrix()
 
 # convert to long format for ggplot
 LDs <- tbl_df(data.frame(ldcalc) %>% dplyr::add_rownames(var = "SNP1")) %>%
@@ -219,6 +226,9 @@ ldplot <- ggplot2::ggplot(LDs) +
 ldplot
 ```
 
+```{r, eval=!whether_plot_LD}
+print("Not enough QTL regions to calculate linkage")
+```
 
 
 <br>
@@ -226,12 +236,12 @@ ldplot
 
 ## Divergent region, haplotype and fine mapping for each significant QTL region:
 
-```{r, results='asis', echo=F, eval=whether_fine_map}
+```{r, results='asis', eval=whether_fine_map}
 link_list = list()
 
 for (i in seq_len(nrow(QTL_peaks))) { 
     
-    region_name = paste0(QTL_peaks[i,"Chrom"], ".", QTL_peaks[i,"Region_start"], "_", QTL_peaks[i,"Region_end"])
+    region_name = paste0(QTL_peaks[i,"Chrom"], ".", QTL_peaks[i,"Region_start"], "-", QTL_peaks[i,"Region_end"])
     
     link_list[i] = paste0("[", region_name, "](cegwas2_report_TRAIT_NAME_HOLDER_region_", region_name, ".html)")
 }
@@ -240,6 +250,10 @@ for (l in link_list) {
     cat("\n##", l, "\n")
     cat("  \n")
 }
+```
+
+```{r, eval=!whether_fine_map}
+print("No significant QTL regions to plot")
 ```
 
 <br>
@@ -252,7 +266,7 @@ for (l in link_list) {
 <br>
 
 + ### SKAT
-```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
 # plots from plot_burden.R
 # Plot SKAT
 skat <- read.delim(paste0("BURDEN/SKAT/Data/", trait_name, ".Skat.assoc"), stringsAsFactors=FALSE) %>%
@@ -311,7 +325,7 @@ DT::datatable(skat_link, escape = FALSE)
 <br>
 
 + ### Variable Threshold
-```{r, echo=FALSE, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
 ##############
 # PLOT VTprice
 benreg_burden <- read.delim(paste0("BURDEN/VT/Data/", trait_name, ".VariableThresholdPrice.assoc"), stringsAsFactors=FALSE)
