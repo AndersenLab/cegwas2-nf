@@ -510,7 +510,7 @@ qtl_peaks
 
 qtl_peaks1
    .splitCsv(sep: '\t')
-   .into{peaks ; printpeaks ; html_report_peaks1 ; html_report_peaks2 }
+   .into{peaks ; printpeaks ; html_report_peaks }
 
 peaks
    .join(processed_map_to_ld)
@@ -712,7 +712,7 @@ genes
 process plot_genes {
 
 	cpus 1
-	memory '10 GB'
+	memory '32 GB'
 
 	tag {phenotype}
 
@@ -899,37 +899,49 @@ process html_region_prep_table {
 ------ Create report for each significant QTL region.
 */
 
-gene_plts
-  .join(html_report_peaks2)
+/*
+output:
+    set val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
+
+qtl_peaks1
+   .splitCsv(sep: '\t') gives [PC1, II, 7319019, 7931252, 8506109] [PC3, X, 3100450, 4347426, 5385392]
+   .into{peaks ; printpeaks ; html_report_peaks }
+
+each TRAIT could have multiple peaks. Each peak have 1 process.
+*/
+
+html_report_peaks
+  .combine(gene_plts)
   .set{input_for_region}
 
 
 process html_report_region {
 
-	executor 'local'
-
 	tag {TRAIT}
+  memory '20 GB'
 
 	publishDir "${params.out}", mode: 'copy', pattern: "*.Rmd"
 	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
 
 	input:
-    set val(TRAIT), file(a), file(b), val(CHROM), val(start_pos), val(peak_pos), val(end_pos) from input_for_region
+    set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(t), file(a), file(b) from input_for_region
     set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_strain_list.txt") from div_hap_table
 
 
 	output:
-		set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into html_rmd_report
+		set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") optional true into html_rmd_report
 
 
 	"""
+    if (( ${end_pos}-1500000 < ${start_pos} )); then
 
-		cat "${workflow.projectDir}/bin/cegwas2_report_region.Rmd" | sed -e "s/TRAIT_NAME_HOLDER/${TRAIT}/g" -e "s/QTL_CHROM_HOLDER/${CHROM}/g" -e "s/QTL_REGION_START_HOLDER/${start_pos}/g" -e "s/QTL_PEAK_HOLDER/${peak_pos}/g" -e "s/QTL_REGION_END_HOLDER/${end_pos}/g" > cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd 
+		  cat "${workflow.projectDir}/bin/cegwas2_report_region.Rmd" | sed -e "s/TRAIT_NAME_HOLDER/${TRAIT}/g" -e "s/QTL_CHROM_HOLDER/${CHROM}/g" -e "s/QTL_REGION_START_HOLDER/${start_pos}/g" -e "s/QTL_PEAK_HOLDER/${peak_pos}/g" -e "s/QTL_REGION_END_HOLDER/${end_pos}/g" > cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd 
 
-    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+      echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
 
-		Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
+		  Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
 
+    fi
 	"""
 
 }

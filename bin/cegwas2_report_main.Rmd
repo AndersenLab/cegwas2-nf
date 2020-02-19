@@ -72,7 +72,7 @@ independent_test_cutoff <- -log10(0.05/independent_tests)
 * #### Light blue regions are QTL intervals that contain markers significantly associate with the trait. These are the regions that will be shown in the phenotype-genotype, fine mapping and gene plots below. 
 
 
-```{r, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=12, out.height=350, out.width=1000}
 # load processed mapping data. 
 # Note that readr::read_delim will throw parsing errors and put NA in rows that contain actual values in strain/value/allele/var.exp so did not use it
 processed_mapping <- read.delim(paste0("Mappings/Data/",trait_name,"_processed_mapping.tsv"), stringsAsFactors=FALSE)
@@ -190,7 +190,7 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
 
 
-```{r}
+```{r, eval=whether_fine_map}
 # print out the table to html
 # this doesn't print within if{}
 DT::datatable(QTL_peaks)
@@ -202,7 +202,7 @@ DT::datatable(QTL_peaks)
 
 ## Pair-wish linkage between QTL regions by R square
 ```{r, fig.width=6, fig.height=4, eval=whether_plot_LD}
-ldcalc <- read.table(file = paste0("Mappings/Data/", trait_name, "_LD_between_QTL_regions.tsv", header = T) %>% as.matrix()
+ldcalc <- read.table(file = paste0("Mappings/Data/", trait_name, "_LD_between_QTL_regions.tsv"), header = T) %>% as.matrix()
 
 # convert to long format for ggplot
 LDs <- tbl_df(data.frame(ldcalc) %>% dplyr::add_rownames(var = "SNP1")) %>%
@@ -388,13 +388,15 @@ DT::datatable(benreg_burden_link, escape = FALSE)
 
 + ### Genes significant in both statistical tests 
 ```{r}
-skat_sig = dplyr::mutate(skat_link, SKAT_stat = Stat)
+skat_sig = dplyr::filter(skat, significant == TRUE) %>% dplyr::rename(SKAT_stat = Stat)
 
-benreg_burden_sig = dplyr::mutate(benreg_burden_link, VariableThreshold_stat = Stat)
+benreg_burden_sig = dplyr::filter(benreg_burden, significant == TRUE)  %>% dplyr::rename(VariableThreshold_stat = Stat)
 
-both_sig = inner_join(skat_sig, benreg_burden_sig, by=c("Gene_ID","RANGE"))
+both_sig = inner_join(skat_sig, benreg_burden_sig, by=c("Gene","RANGE")) %>% 
+    mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
+    select(Gene_ID, RANGE, SKAT_stat, VariableThreshold_stat)  
 
-DT::datatable(both_sig) 
+DT::datatable(both_sig, escape = FALSE) 
 ```
 
 <br>
