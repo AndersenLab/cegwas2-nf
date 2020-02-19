@@ -152,6 +152,8 @@ manhattan_plot
 
 if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
+    whether_print_peaks=TRUE
+        
     QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
         dplyr::filter(V1==trait_name)  %>% 
         dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) 
@@ -183,17 +185,22 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
     
 } else { 
     print("No significant peak for this trait")
+    whether_print_peaks = FALSE
     whether_plot_LD = FALSE
     whether_fine_map = FALSE
 }
 ```
 
 
-
-```{r, eval=whether_fine_map}
+```{r, eval=whether_print_peaks}
 # print out the table to html
 # this doesn't print within if{}
-DT::datatable(QTL_peaks)
+# QTL_peaks was filtered in previous chunk, so reload
+QTL_peaks_original <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
+        dplyr::filter(V1==trait_name)  %>% 
+        dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) 
+
+DT::datatable(QTL_peaks_original)
 
 ```
 
@@ -234,7 +241,8 @@ print("Not enough QTL regions to calculate linkage")
 <br>
 <br>
 
-## Divergent region, haplotype and fine mapping for each significant QTL region:
+## Divergent region, haplotype and fine mapping for each significant QTL region 
+Only for regions less than 1.5Mb in size
 
 ```{r, results='asis', eval=whether_fine_map}
 link_list = list()
