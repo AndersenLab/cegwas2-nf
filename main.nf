@@ -22,7 +22,7 @@ params.group_qtl = 1000
 params.ci_size   = 150
 params.fix_names = "fix"
 params.help 	 = null
-params.R_libpath="/projects/b1059/software/R_lib_3.4.1"
+params.R_libpath="/projects/b1059/software/R_lib_3.6.0"
 
 println()
 

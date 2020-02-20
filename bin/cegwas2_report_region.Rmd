@@ -40,7 +40,7 @@ library("tidyverse", lib.loc = library.path)
 library("ggbeeswarm", lib.loc = library.path)
 library("rrBLUP", lib.loc = library.path)
 library("plotly", lib.loc = library.path)
-library("gridExtra", lib.loc = library.path)
+library("cowplot", lib.loc = library.path)
 library("ComplexHeatmap", lib.loc = library.path)
 
 ```
@@ -431,7 +431,7 @@ p2 = ggplot(filter(plot_df),
     theme(panel.spacing = unit(1, "lines"))
 
 
-grid.arrange(p1, p2, ncol=2)
+plot_grid(p1, p2, ncol=2)
  
 # ggplotly(p1) # cannot get the panel size to maintain the scale
 ```
