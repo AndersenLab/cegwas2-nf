@@ -13,8 +13,8 @@ params.p3d 		 = null
 params.sthresh   = null
 params.freqUpper = 0.05
 params.minburden = 2
-params.refflat   = "bin/refFlat.ws245.txt"
-params.genes     = "bin/gene_ref_flat.Rda"
+params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
+params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
 params.cendr_v   = "20180527"
 params.e_mem 	 = "10"
 params.eigen_mem = params.e_mem + " GB"
@@ -854,7 +854,7 @@ process html_report_main {
 
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
 
-    Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_main.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
+    Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_main.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
 
   """
 }
@@ -939,7 +939,7 @@ process html_report_region {
 
       echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
 
-		  Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.projectDir}/${params.out}')"
+		  Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
 
     fi
 	"""
