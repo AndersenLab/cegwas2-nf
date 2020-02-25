@@ -117,7 +117,7 @@ manhattan_plot = processed_mapping %>%
                         alpha = .75,  
                         size = 1,
                         linetype = 2) +
-    ggplot2::geom_point( ggplot2::aes(color= factor(EIGEN_SIG)) ) +
+    ggplot2::geom_point( ggplot2::aes(color= factor(EIGEN_SIG)), size = 0.8 ) +
     ggplot2::facet_grid( . ~ CHROM, scales = "free_x" , space = "free_x") +
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
@@ -292,7 +292,7 @@ skat <- read.delim(paste0("BURDEN/SKAT/Data/", trait_name, ".Skat.assoc"), strin
 skat_plot <- skat%>%
     ggplot()+
     aes(x = POS/1e6, y = -log10(Pvalue), alpha = 0.5, color = significant, plotly_label_geneID = Gene )+
-    geom_point()+
+    geom_point(size = 0.8)+
     scale_color_manual(values=c("black","red"))+
     facet_grid(.~CHROM, scales = "free", space = "free")+
     ggplot2::theme_bw() +
@@ -353,7 +353,7 @@ benreg_burden<-benreg_burden%>%
 burden_manplot <- benreg_burden%>%
     ggplot()+
     aes(x = POS/1e6, y = Stat, size = NumVar, alpha = 0.5, color = significant, plotly_label_geneID = Gene) +
-    geom_point(size = 0.25)+
+    geom_point(size = 0.8)+
     scale_color_manual(values=c("black","red"))+
     facet_grid(.~CHROM, scales = "free", space = "free")+
     theme_bw()+
