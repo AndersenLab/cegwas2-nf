@@ -117,7 +117,7 @@ manhattan_plot = processed_mapping %>%
                         alpha = .75,  
                         size = 1,
                         linetype = 2) +
-    ggplot2::geom_point( ggplot2::aes(color= factor(EIGEN_SIG)), size = 0.8 ) +
+    ggplot2::geom_point( ggplot2::aes(color= factor(EIGEN_SIG)) ) +
     ggplot2::facet_grid( . ~ CHROM, scales = "free_x" , space = "free_x") +
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
@@ -274,7 +274,7 @@ print("No significant QTL regions to plot")
 <br>
 
 + ### SKAT
-```{r, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=10, out.width=900}
 # plots from plot_burden.R
 # Plot SKAT
 skat <- read.delim(paste0("BURDEN/SKAT/Data/", trait_name, ".Skat.assoc"), stringsAsFactors=FALSE) %>%
@@ -333,7 +333,7 @@ DT::datatable(skat_link, escape = FALSE)
 <br>
 
 + ### Variable Threshold
-```{r, fig.height=3.5, fig.width=10, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=10, out.width=900}
 ##############
 # PLOT VTprice
 benreg_burden <- read.delim(paste0("BURDEN/VT/Data/", trait_name, ".VariableThresholdPrice.assoc"), stringsAsFactors=FALSE)
