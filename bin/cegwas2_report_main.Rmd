@@ -49,8 +49,7 @@ library("DT", lib.loc = library.path)
 ```{r}
 # load trait name
 # in nextflow use sed to edit this field and make a copy of the .rmd for each trait
-trait_name="TRAIT_NAME_HOLDER"   
-# trait_name="PC1"
+trait_name <- "TRAIT_NAME_HOLDER"   
 
 # load independent tests result
 total_independent_tests <- read.table("Genotype_Matrix/total_independent_tests.txt", quote="\"", comment.char="", stringsAsFactors=FALSE)
@@ -90,7 +89,7 @@ if(num_traits > 1){
 
 # Generate _manplot from Run_Mappings.R
 
-manhattan_plot = processed_mapping %>%
+manhattan_plot <- processed_mapping %>%
     dplyr::filter(trait == unique(processed_mapping$trait)[1] & CHROM != "MtDNA") %>%
     dplyr::distinct(marker, .keep_all = T) %>%
     dplyr::mutate(EIGEN_CUTOFF = independent_test_cutoff) %>%
@@ -134,7 +133,7 @@ manhattan_plot = processed_mapping %>%
                   y = expression(-log[10](italic(p))))
 
 
-# save the plot to file
+# save the plot to file. keep this code for user to create plots with their own styles
 # ggsave(manhattan_plot, 
 #        filename = paste0(trait_name, "_manplot.pdf"),
 #        height = 4, 
@@ -152,7 +151,7 @@ manhattan_plot
 
 if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
-    whether_print_peaks=TRUE
+    whether_print_peaks <- TRUE
         
     QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
         dplyr::filter(V1==trait_name)  %>% 
@@ -160,14 +159,14 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
     
     
     if (nrow(QTL_peaks) < 2) { 
-        whether_plot_LD = FALSE 
-        } else { whether_plot_LD = TRUE }
+        whether_plot_LD <- FALSE 
+        } else { whether_plot_LD <- TRUE }
     
     
     if (nrow(QTL_peaks)==0) {
         print("No significant QTL region for this trait")
-        whether_fine_map = FALSE # skip related chunks
-        whether_plot_LD = FALSE
+        whether_fine_map <- FALSE # skip related chunks
+        whether_plot_LD <- FALSE
     } else {
 
 
@@ -175,19 +174,19 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
         
         if (nrow(QTL_peaks)==0) {
             print("Significant QTL regions are too wide for plotting")
-            whether_fine_map = FALSE # skip related chunks
+            whether_fine_map <- FALSE # skip related chunks
             
         } else {
-            whether_fine_map = TRUE # run related chunks
+            whether_fine_map <- TRUE # run related chunks
             
         }
     }
     
 } else { 
     print("No significant peak for this trait")
-    whether_print_peaks = FALSE
-    whether_plot_LD = FALSE
-    whether_fine_map = FALSE
+    whether_print_peaks <- FALSE
+    whether_plot_LD <- FALSE
+    whether_fine_map <- FALSE
 }
 ```
 
@@ -245,13 +244,13 @@ print("Not enough QTL regions to calculate linkage")
 Only for regions less than 1.5Mb in size
 
 ```{r, results='asis', eval=whether_fine_map}
-link_list = list()
+link_list <- list()
 
 for (i in seq_len(nrow(QTL_peaks))) { 
     
-    region_name = paste0(QTL_peaks[i,"Chrom"], ".", QTL_peaks[i,"Region_start"], "-", QTL_peaks[i,"Region_end"])
+    region_name <- paste0(QTL_peaks[i,"Chrom"], ".", QTL_peaks[i,"Region_start"], "-", QTL_peaks[i,"Region_end"])
     
-    link_list[i] = paste0("[", region_name, "](cegwas2_report_TRAIT_NAME_HOLDER_region_", region_name, ".html)")
+    link_list[i] <- paste0("[", region_name, "](cegwas2_report_TRAIT_NAME_HOLDER_region_", region_name, ".html)")
 }
 
 for (l in link_list) {
@@ -322,7 +321,7 @@ ggplotly(skat_plot, tooltip = c("plotly_label_geneID","y")) %>% toWebGL()
 
 # show table in html output. 
 # Pvalue is the y-axis in plot
-skat_link = filter(skat, significant == TRUE) %>% 
+skat_link <- filter(skat, significant == TRUE) %>% 
     mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
     select(Gene_ID, RANGE, Stat, significant)  
 
@@ -384,7 +383,7 @@ ggplotly(burden_manplot, tooltip = c("plotly_label_geneID","y")) %>% toWebGL()
 
 # show table in html output. 
 # Stat is the y-axis in plot. what is it??
-benreg_burden_link = filter(benreg_burden, significant == TRUE) %>% 
+benreg_burden_link <- filter(benreg_burden, significant == TRUE) %>% 
     mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
     select(Gene_ID, RANGE, Stat, significant)  
 
@@ -396,11 +395,11 @@ DT::datatable(benreg_burden_link, escape = FALSE)
 
 + ### Genes significant in both statistical tests 
 ```{r}
-skat_sig = dplyr::filter(skat, significant == TRUE) %>% dplyr::rename(SKAT_stat = Stat)
+skat_sig <- dplyr::filter(skat, significant == TRUE) %>% dplyr::rename(SKAT_stat = Stat)
 
-benreg_burden_sig = dplyr::filter(benreg_burden, significant == TRUE)  %>% dplyr::rename(VariableThreshold_stat = Stat)
+benreg_burden_sig <- dplyr::filter(benreg_burden, significant == TRUE)  %>% dplyr::rename(VariableThreshold_stat = Stat)
 
-both_sig = inner_join(skat_sig, benreg_burden_sig, by=c("Gene","RANGE")) %>% 
+both_sig <- inner_join(skat_sig, benreg_burden_sig, by=c("Gene","RANGE")) %>% 
     mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
     select(Gene_ID, RANGE, SKAT_stat, VariableThreshold_stat)  
 
