@@ -64,11 +64,11 @@ independent_test_cutoff <- -log10(0.05/independent_tests)
 ## Manhatton plot
 * #### Every dot is a SNV marker.
 
-* #### Red/pink dots are significant QTL loci based on defined thresholds. 
-    * Default BF cutoff -log10(p) > 6. If user supplied threshold exists, it will replace BF.
-    * Eigen cutoff: -log10(0.05/independent_tests) where "independent_tests" is calculated from Eigen Decomposition of SNV correlation matrix, stored in Analysis_Results-date/⁩Genotype_Matrix/total_independent_tests.txt
+* #### SNVs are colored red if they pass the genome-wide corrected significance threshold:
+    * If Bonferroni-corrected significance (BF) threshold were used: the horizontal solid line corresponds to BF threshold, and the horizontal dash line corresponds to EIGEN threshold (see below). If user supplied threshold exists, it will replace the BF threshold.
+    * If Eigen-decomposition significance threshold were used: the horizontal solid line overlaps with the dash line and corresponds to the EIGEN threshold, which corrects for the number of independent markers in your data set.
 
-* #### Light blue regions are QTL intervals that contain markers significantly associate with the trait. These are the regions that will be shown in the phenotype-genotype, fine mapping and gene plots below. 
+* #### Light blue regions are QTL confidence intervals. These regions have separate report pages with links below.
 
 
 ```{r, fig.height=3.5, fig.width=12, out.height=350, out.width=1000}
