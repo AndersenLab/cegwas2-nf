@@ -586,11 +586,15 @@ gene_plot <- ggplot(gene_df) +
 ggplotly(gene_plot, tooltip = c("plotly_label_gene_name", "plotly_label_gene_ID", "plotly_label_variant")) %>% toWebGL()
 
 
-# store table for html output
-gene_list_out <- select(tidy_genes_in_region, MARKER, GENE_NAME, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE, Phenotype_Value) %>% dplyr::slice(1:20)
+# gene list for html output
+gene_info <- tidy_genes_in_region %>%
+    dplyr::filter(QTL_INTERVAL_START == QTL_Region_start & !is.na(WBGeneID)) %>%
+    dplyr::select(GENE_NAME, WBGeneID, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS) %>% 
+    dplyr::distinct() %>% 
+    mutate(WBGeneID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', WBGeneID, '>', WBGeneID,'</a>' ) ) 
 
-DT::datatable(gene_list_out)
 
+DT::datatable(gene_info, escape = FALSE)
 
 ```
 
