@@ -18,9 +18,9 @@ output:
 * This R Markdown file imports data tables within Analysis_Results-Date folder and will knit without any modification.
 <br>
 * Features for the interactive plots: 
-    * Place mouse on plot region to show related underlying data.
-    * Hold and drag the mouse to select a region to zoom in, double click to reset zoom.
-    * Click on legend to show/hide different data groups.
+* Hover over the plot region to show underlying data.
+* Click and drag to select a zoom region, double click to reset zoom.
+* Click on the legend to show/hide different data groups.
 <br>
 * ggsave code is kept for users to make customized plots. 
 <br>
@@ -86,52 +86,52 @@ user_strain_pheno_list <- dplyr::select(processed_mapping, strain, value) %>% dp
 # read in data table for gene annotation for each QTL region
 tidy_genes_in_region <- read.delim(paste0("Fine_Mappings/Data/", trait_name, "_snpeff_genes.tsv"), stringsAsFactors=FALSE) %>% 
     select(MARKER, POS, REF, ALT, GENE_NAME, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE, Phenotype_Value)
-   
-    QTL_peak <- paste0(QTL_Chrom,".",QTL_Peak)
-    
-    QTL_region <- paste0(QTL_Chrom,".",QTL_Region_start,"-",QTL_Region_end)
-    
-    ############## phenotype-genotype plot from Run_Mapping.R
-    pxg_df <- na.omit(processed_mapping) %>% # probably the na.omit is not needed any more
-        dplyr::filter(CHROM==QTL_Chrom, peakPOS==QTL_Peak) %>%  
-        dplyr::mutate(value=as.numeric(value)) %>% 
-        group_by(allele) %>%
-        dplyr::mutate(mean_pheno = mean(value, na.rm = T)) 
-    
-    
-    pxg_plot <- pxg_df %>% 
-        ggplot()+
-        aes(x = factor(allele, levels = c(-1,1), labels = c("REF","ALT")))+
-        geom_beeswarm(cex=3, priority='density',
-                      aes(y = value, plotly_label=strain),
-                      shape = 21, 
-                      fill = "gray50",
-                      size = 2)+
-        geom_point(aes(y = mean_pheno), 
-                   fill = "red", 
-                   size = 3, 
-                   shape = 25)+
-        theme_bw(15)+
-        labs(y = trait_name,
-             x = "Genotype") +
-        theme(axis.text.x = ggplot2::element_text(size = 14),
-              axis.text.y = ggplot2::element_text(size = 14),
-              axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
-              axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
-              strip.text.x = element_text(size = 14, face = "bold"))+
-        theme(legend.position = "none") 
-    
-    
-    # save plot to file
-    # ggsave(pxg_plot, filename = paste0(QTL_peak, "_pxgplot.pdf"),
-    #        height = 4, 
-    #        width = 4, limitsize = FALSE)
-    
-    
-    # interactive plots
-    ggplotly(pxg_plot, tooltip = c("plotly_label", "y")) %>%
-        layout(autosize = F, width = 400, height = 400)
-    
+
+QTL_peak <- paste0(QTL_Chrom,".",QTL_Peak)
+
+QTL_region <- paste0(QTL_Chrom,".",QTL_Region_start,"-",QTL_Region_end)
+
+############## phenotype-genotype plot from Run_Mapping.R
+pxg_df <- na.omit(processed_mapping) %>% # probably the na.omit is not needed any more
+    dplyr::filter(CHROM==QTL_Chrom, peakPOS==QTL_Peak) %>%  
+    dplyr::mutate(value=as.numeric(value)) %>% 
+    group_by(allele) %>%
+    dplyr::mutate(mean_pheno = mean(value, na.rm = T)) 
+
+
+pxg_plot <- pxg_df %>% 
+    ggplot()+
+    aes(x = factor(allele, levels = c(-1,1), labels = c("REF","ALT")))+
+    geom_beeswarm(cex=3, priority='density',
+                  aes(y = value, plotly_label=strain),
+                  shape = 21, 
+                  fill = "gray50",
+                  size = 2)+
+    geom_point(aes(y = mean_pheno), 
+               fill = "red", 
+               size = 3, 
+               shape = 25)+
+    theme_bw(15)+
+    labs(y = trait_name,
+         x = "Genotype") +
+    theme(axis.text.x = ggplot2::element_text(size = 14),
+          axis.text.y = ggplot2::element_text(size = 14),
+          axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
+          axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
+          strip.text.x = element_text(size = 14, face = "bold"))+
+    theme(legend.position = "none") 
+
+
+# save plot to file
+# ggsave(pxg_plot, filename = paste0(QTL_peak, "_pxgplot.pdf"),
+#        height = 4, 
+#        width = 4, limitsize = FALSE)
+
+
+# interactive plots
+ggplotly(pxg_plot, tooltip = c("plotly_label", "y")) %>%
+    layout(autosize = F, width = 400, height = 400)
+
 ```
 
 <br>
@@ -164,14 +164,30 @@ all_QTL_bins <- read.delim("Divergent_and_haplotype/all_QTL_bins.bed", header=FA
 # makes sure do this after checking QTL_peaks exist, otherwise if all_QTL_div.bed is empty, could also be there is no peak
 if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     
-    all_QTL_div <- read.delim("Divergent_and_haplotype/all_QTL_div.bed", header=FALSE, stringsAsFactors=FALSE)
-    strain_QTL_div <- dplyr::filter(all_QTL_div, V4 %in% user_strain_pheno_list$strain)
-    
-    
     # take genomic 1kb bins within the QTL region
     # format to the same as div regions
     # during spread, this "all_bins" will dictate number of rows in resulting dataframe
     region_QTL_bins <- filter(all_QTL_bins, V1==QTL_Chrom & V2 > QTL_Region_start & V3 < QTL_Region_end ) %>% mutate(V4="all_bins", V5=0)
+    
+    
+    # if any of user supplied strains have divergent region with the QTL region
+    if (file.info("Divergent_and_haplotype/all_QTL_div.bed")$size!=0) {
+        
+        all_QTL_div <- read.delim("Divergent_and_haplotype/all_QTL_div.bed", header=FALSE, stringsAsFactors=FALSE)
+        
+    } else {
+        # create an empty dataframe
+        all_QTL_div <- data.frame(V1=character(),
+                                  V2=integer(), 
+                                  V3=integer(), 
+                                  V4=character(), 
+                                  V5=integer(), 
+                                  stringsAsFactors=FALSE)
+    }
+    
+    
+    strain_QTL_div <- dplyr::filter(all_QTL_div, V4 %in% user_strain_pheno_list$strain)
+    
     
     # take divergent bins within the QTL region, for all user tested strains
     # append all_bins within QTL region to the QTL_div 
@@ -209,7 +225,7 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     m2 <- t(m)
     colnames(m2) <- region_QTL_div$V2
     
-  
+    
     # add REF/ALT annotation
     ref_alt <- filter(processed_mapping, peakPOS == QTL_Peak) %>% select(strain, allele) %>% filter(strain %in% row.names(m2))
     
@@ -228,7 +244,7 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     peak_bin <- floor(QTL_Peak/1000)*1000
     ref_alt_annotation <- mutate(ref_alt_annotation, is_div = m2[strain, as.character(peak_bin)])
     
-
+    
     # decide whether there is enough strains with divergent region to split phenotype genotype plot
     if (nrow(filter(ref_alt_annotation, is_div == 1)) > nrow(ref_alt_annotation)/20 ) {
         split_by_div = TRUE
@@ -257,19 +273,19 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
     
     
     ht <- Heatmap(m2, name="div_region",
-                 row_split=factor(ref_alt_annotation$geno_group_count,
-                                  levels=c(paste0("REF(", ref_count[1,2], ")"), paste0("ALT(", alt_count[1,2], ")"))), row_gap = unit(3, "mm"),
-                 cluster_columns = FALSE, 
-                 show_row_dend = FALSE, 
-                 cluster_row_slices=FALSE, 
-                 col = colors, 
-                 heatmap_legend_param = list( title="",
-                     at = legend_mapping$div_group,
-                     labels = as.character(legend_mapping$div_label)),
-                 show_column_names = FALSE,
-                 show_row_names = FALSE,
-                 bottom_annotation = x_axis_label,
-                 top_annotation = peak_label_space)
+                  row_split=factor(ref_alt_annotation$geno_group_count,
+                                   levels=c(paste0("REF(", ref_count[1,2], ")"), paste0("ALT(", alt_count[1,2], ")"))), row_gap = unit(3, "mm"),
+                  cluster_columns = FALSE, 
+                  show_row_dend = FALSE, 
+                  cluster_row_slices=FALSE, 
+                  col = colors, 
+                  heatmap_legend_param = list( title="",
+                                               at = legend_mapping$div_group,
+                                               labels = as.character(legend_mapping$div_label)),
+                  show_column_names = FALSE,
+                  show_row_names = FALSE,
+                  bottom_annotation = x_axis_label,
+                  top_annotation = peak_label_space)
     
     draw(ht)
     
@@ -305,54 +321,54 @@ if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
 <br>
 ```{r, fig.width=20, fig.height=10}
 # if (file.info("all_QTL_div.bed")$size!=0) {
-    
-    haplotype_in_QTL_region <- read.delim("Divergent_and_haplotype/haplotype_in_QTL_region.txt", header=FALSE, stringsAsFactors=FALSE) %>% select(-V13)
+
+haplotype_in_QTL_region <- read.delim("Divergent_and_haplotype/haplotype_in_QTL_region.txt", header=FALSE, stringsAsFactors=FALSE) %>% select(-V13)
 
 names(haplotype_in_QTL_region) <- c("chromosome", "start", "stop", "haplotype", "isotype", "plotpoint", "segment", "color", "color_new", "Chrom", "Region_start", "Region_end")
 
 
-    ########### filter only tested strains
-  
-    ########### keep rows for this QTL region
-   ############ keep relavent columns for plotting
-    
-    plot_df <- filter(haplotype_in_QTL_region, Chrom == QTL_Chrom & Region_start == QTL_Region_start) %>% 
+########### filter only tested strains
+
+########### keep rows for this QTL region
+############ keep relavent columns for plotting
+
+plot_df <- filter(haplotype_in_QTL_region, Chrom == QTL_Chrom & Region_start == QTL_Region_start) %>% 
     select(chromosome, start, stop, haplotype, isotype, plotpoint, segment, color, color_new)
-    
-    
-    ########### sort by haplotype of 1st and last segment
-    
-    plot_df_seg_1 <- plot_df %>% dplyr::arrange(isotype, start) %>%
-        dplyr::distinct(isotype, .keep_all = TRUE) %>% 
-        dplyr::select(isotype, haplotype) %>% 
-        dplyr::rename(haplotype_start = haplotype)
-    
-    plot_df_seg_last <- plot_df %>% dplyr::arrange(isotype, -start) %>%
-        dplyr::distinct(isotype, .keep_all = TRUE) %>% 
-        dplyr::select(isotype, haplotype) %>% 
-        dplyr::rename(haplotype_end = haplotype) 
-    
-    plot_df_sort_order <- inner_join(plot_df_seg_1, plot_df_seg_last) %>%
-        dplyr::arrange(haplotype_start, haplotype_end) %>% 
-        dplyr::mutate(plotpoint2=row_number()) %>% 
+
+
+########### sort by haplotype of 1st and last segment
+
+plot_df_seg_1 <- plot_df %>% dplyr::arrange(isotype, start) %>%
+    dplyr::distinct(isotype, .keep_all = TRUE) %>% 
+    dplyr::select(isotype, haplotype) %>% 
+    dplyr::rename(haplotype_start = haplotype)
+
+plot_df_seg_last <- plot_df %>% dplyr::arrange(isotype, -start) %>%
+    dplyr::distinct(isotype, .keep_all = TRUE) %>% 
+    dplyr::select(isotype, haplotype) %>% 
+    dplyr::rename(haplotype_end = haplotype) 
+
+plot_df_sort_order <- inner_join(plot_df_seg_1, plot_df_seg_last) %>%
+    dplyr::arrange(haplotype_start, haplotype_end) %>% 
+    dplyr::mutate(plotpoint2=row_number()) %>% 
     inner_join(ref_alt, by=c("isotype"="strain")) %>% 
-        dplyr::group_by(geno_group) %>% 
-        dplyr::mutate(plotpoint3 = rank(plotpoint2)) %>% 
-        ungroup() %>% select(isotype, plotpoint3, geno_group)
-    
+    dplyr::group_by(geno_group) %>% 
+    dplyr::mutate(plotpoint3 = rank(plotpoint2)) %>% 
+    ungroup() %>% select(isotype, plotpoint3, geno_group)
 
-    ########## add new plotpoint back to plot_df 
-    
-    plot_df <- inner_join(plot_df, plot_df_sort_order, by="isotype")
 
-    ########## relevel REF/ALT
-    
-    plot_df$geno_group <- factor(plot_df$geno_group, levels=c("REF","ALT"))
-    
- 
-    #=======================#
-    # Normal haplotype plot #
-    #=======================#
+########## add new plotpoint back to plot_df 
+
+plot_df <- inner_join(plot_df, plot_df_sort_order, by="isotype")
+
+########## relevel REF/ALT
+
+plot_df$geno_group <- factor(plot_df$geno_group, levels=c("REF","ALT"))
+
+
+#=======================#
+# Normal haplotype plot #
+#=======================#
 
 
 mcolor_grp <- plot_df %>% dplyr::select(haplotype, color) %>% dplyr::distinct()
@@ -367,9 +383,9 @@ strain_labels <- plot_df %>%
     dplyr::select(isotype, plotpoint3) %>% dplyr::distinct()
 
 p1 <- ggplot(filter(plot_df),
-       aes(xmin = start, xmax = stop,
-           ymin = plotpoint3 - 0.5, ymax = plotpoint3 + 0.5,
-           fill = haplotype)) +
+             aes(xmin = start, xmax = stop,
+                 ymin = plotpoint3 - 0.5, ymax = plotpoint3 + 0.5,
+                 fill = haplotype)) +
     geom_rect() +
     scale_fill_manual(values = mcolor) +
     scale_y_continuous(breaks = strain_labels$plotpoint3,
@@ -379,18 +395,18 @@ p1 <- ggplot(filter(plot_df),
     theme_bw() +
     coord_cartesian(xlim=c(QTL_Region_start, QTL_Region_end)) +
     theme(legend.position="none") +
-        geom_vline(xintercept = QTL_Peak) +
-        facet_grid(geno_group ~ ., scales = "free", space = "free") + 
+    geom_vline(xintercept = QTL_Peak) +
+    facet_grid(geno_group ~ ., scales = "free", space = "free") + 
     theme(panel.spacing = unit(1, "lines"))
- 
+
 
 #ggsave(paste0("haplotype_", QTL_Chrom, ".", QTL_Region_start, ".", QTL_Region_end, ".png"), p, height = 30, width = 8)
 
 
 p2 <- ggplot(filter(plot_df),
-       aes(xmin = start, xmax = stop,
-           ymin = plotpoint3 - 0.5, ymax = plotpoint3 + 0.5,
-           fill = haplotype)) +
+             aes(xmin = start, xmax = stop,
+                 ymin = plotpoint3 - 0.5, ymax = plotpoint3 + 0.5,
+                 fill = haplotype)) +
     geom_rect() +
     scale_fill_manual(values = mcolor2) +
     scale_y_continuous(breaks = strain_labels$plotpoint3,
@@ -400,13 +416,13 @@ p2 <- ggplot(filter(plot_df),
     theme_bw() +
     coord_cartesian(xlim=c(QTL_Region_start, QTL_Region_end)) +
     theme(legend.position="none") +
-        geom_vline(xintercept = QTL_Peak) +
-        facet_grid(geno_group ~ ., scales = "free", space = "free") + 
+    geom_vline(xintercept = QTL_Peak) +
+    facet_grid(geno_group ~ ., scales = "free", space = "free") + 
     theme(panel.spacing = unit(1, "lines"))
 
 
 plot_grid(p1, p2, ncol=2)
- 
+
 # ggplotly(p1) # cannot get the grid panel size to maintain the scale. to be fixed.
 ```
 <br>
@@ -418,40 +434,40 @@ cat("  \n")
 ```
 
 ```{r, eval=split_by_div}
-    pxg_df <- na.omit(processed_mapping) %>% # probably the na.omit is not needed any more
-        dplyr::filter(CHROM==QTL_Chrom, peakPOS==QTL_Peak) %>%  
-        dplyr::mutate(value=as.numeric(value)) %>% 
-        inner_join(ref_alt_annotation, by="strain") %>% 
-        group_by(allele, is_div) %>%
-        dplyr::mutate(mean_pheno = mean(value, na.rm = T))
-    
-    
-    pxg_plot <- pxg_df %>% 
-        ggplot()+
-        aes(x = factor(allele, levels = c(-1,1), labels = c("REF","ALT")))+
-        geom_beeswarm(cex=3, priority='density',
-                      aes(y = value, plotly_label=strain),
-                      shape = 21, 
-                      fill = "gray50",
-                      size = 2)+
-        geom_point(aes(y = mean_pheno), 
-                   fill = "red", 
-                   size = 3, 
-                   shape = 25)+
-        theme_bw(15)+
-        labs(y = trait_name,
-             x = "Genotype") +
-        theme(axis.text.x = ggplot2::element_text(size = 14),
-              axis.text.y = ggplot2::element_text(size = 14),
-              axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
-              axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
-              strip.text.x = element_text(size = 14, face = "bold"))+
-        theme(legend.position = "none") +
-        facet_wrap(~is_div, labeller = labeller(is_div = 
-    c("-1" = "no div data",
-      "0" = "not divergent",
-      "1" = "divergent from N2")) )
-    
+pxg_df <- na.omit(processed_mapping) %>% # probably the na.omit is not needed any more
+    dplyr::filter(CHROM==QTL_Chrom, peakPOS==QTL_Peak) %>%  
+    dplyr::mutate(value=as.numeric(value)) %>% 
+    inner_join(ref_alt_annotation, by="strain") %>% 
+    group_by(allele, is_div) %>%
+    dplyr::mutate(mean_pheno = mean(value, na.rm = T))
+
+
+pxg_plot <- pxg_df %>% 
+    ggplot()+
+    aes(x = factor(allele, levels = c(-1,1), labels = c("REF","ALT")))+
+    geom_beeswarm(cex=3, priority='density',
+                  aes(y = value, plotly_label=strain),
+                  shape = 21, 
+                  fill = "gray50",
+                  size = 2)+
+    geom_point(aes(y = mean_pheno), 
+               fill = "red", 
+               size = 3, 
+               shape = 25)+
+    theme_bw(15)+
+    labs(y = trait_name,
+         x = "Genotype") +
+    theme(axis.text.x = ggplot2::element_text(size = 14),
+          axis.text.y = ggplot2::element_text(size = 14),
+          axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
+          axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
+          strip.text.x = element_text(size = 14, face = "bold"))+
+    theme(legend.position = "none") +
+    facet_wrap(~is_div, labeller = labeller(is_div = 
+                                                c("-1" = "no div data",
+                                                  "0" = "not divergent",
+                                                  "1" = "divergent from N2")) )
+
 ggplotly(pxg_plot, tooltip = c("plotly_label", "y"))
 ```
 
@@ -459,121 +475,121 @@ ggplotly(pxg_plot, tooltip = c("plotly_label", "y"))
 
 ## Fine mapping plot
 ```{r, out.height=450, out.width=1000}
-    #################### Generate fine mapping plots from Finemap_QTL_Intervals.R
-    
-    # load data. File name format is PC1.II.7319019.8506109_prLD_df.tsv
-    prLD_file_name <- paste0("Fine_Mappings/Data/",trait_name,".",QTL_Chrom,".",QTL_Region_start,".",QTL_Region_end,"_prLD_df.tsv")
-    
-    pr_roi_ld <- read.delim(prLD_file_name, stringsAsFactors=FALSE) %>% 
-        dplyr::mutate(marker = stringr::str_replace(marker, "_", ":")) 
-    
-    peak_roi_marker <- dplyr::filter(pr_roi_ld, POS == QTL_Peak)
-    
-    ld_plot <- pr_roi_ld %>% ggplot() +
-        aes(x = POS/1e6, plotly_label_ld = marker) +
-        geom_point(aes(color = ld_r2, y = value), shape = 17, size = 2) +
-        geom_point(data = peak_roi_marker, aes(y = value), shape = 23, size = 2, fill = "red") +
-        scale_color_viridis_c(name = "LD R^2") +
-        theme_bw(15)+
-        labs(x = "Genomic Position (Mb)",
-             y = "-log[10]p") 
-   
-    
-    # save plot to file
-    # ggsave(ld_plot, filename = paste0(QTL_peak, "_finemap_plot.pdf"),
-    #        height = 4,
-    #        width = 12)
-    # 
-    
-    # interactive plots
-    ggplotly(ld_plot, tooltip = c("plotly_label_ld", "y")) # %>% toWebGL()
-    
+#################### Generate fine mapping plots from Finemap_QTL_Intervals.R
+
+# load data. File name format is PC1.II.7319019.8506109_prLD_df.tsv
+prLD_file_name <- paste0("Fine_Mappings/Data/",trait_name,".",QTL_Chrom,".",QTL_Region_start,".",QTL_Region_end,"_prLD_df.tsv")
+
+pr_roi_ld <- read.delim(prLD_file_name, stringsAsFactors=FALSE) %>% 
+    dplyr::mutate(marker = stringr::str_replace(marker, "_", ":")) 
+
+peak_roi_marker <- dplyr::filter(pr_roi_ld, POS == QTL_Peak)
+
+ld_plot <- pr_roi_ld %>% ggplot() +
+    aes(x = POS/1e6, plotly_label_ld = marker) +
+    geom_point(aes(color = ld_r2, y = value), shape = 17, size = 2) +
+    geom_point(data = peak_roi_marker, aes(y = value), shape = 23, size = 2, fill = "red") +
+    scale_color_viridis_c(name = "LD R^2") +
+    theme_bw(15)+
+    labs(x = "Genomic Position (Mb)",
+         y = "-log[10]p") 
+
+
+# save plot to file
+# ggsave(ld_plot, filename = paste0(QTL_peak, "_finemap_plot.pdf"),
+#        height = 4,
+#        width = 12)
+# 
+
+# interactive plots
+ggplotly(ld_plot, tooltip = c("plotly_label_ld", "y")) # %>% toWebGL()
+
 ```
 
 
 
 ## Gene plot
 ```{r, out.height=450, out.width=1000}
-    ######################## Generate gene plot from plot_genes.R
-    # create table to store gene related information
-    gene_info <- tidy_genes_in_region %>%
-        dplyr::filter(QTL_INTERVAL_START == QTL_Region_start & !is.na(WBGeneID)) %>%
-        dplyr::select(GENE_NAME, WBGeneID, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END) %>% dplyr::distinct()
-    
-    # for each gene, keep the most significant overlapping variant log10p
-    # this is used as y-axix of gene position
-    gene_df <- tidy_genes_in_region %>%
-        dplyr::filter(QTL_INTERVAL_START == QTL_Region_start & !is.na(WBGeneID)) %>%
-        dplyr::distinct(MARKER, GENE_NAME, WBGeneID, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p) %>%
-        dplyr::group_by(WBGeneID) %>% 
-        dplyr::summarise(VARIANT_LOG10p = max(VARIANT_LOG10p, na.rm = T)) %>% 
-        dplyr::inner_join(gene_info) %>% 
-        dplyr::mutate(STRAND = ifelse(STRAND=="+", "Gene_on_plus_strand", "Gene_on_minus_strand"))
-    
+######################## Generate gene plot from plot_genes.R
+# create table to store gene related information
+gene_info <- tidy_genes_in_region %>%
+    dplyr::filter(QTL_INTERVAL_START == QTL_Region_start & !is.na(WBGeneID)) %>%
+    dplyr::select(GENE_NAME, WBGeneID, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END) %>% dplyr::distinct()
 
-    peak_variant <- QTL_Peak
-    
-    variant_df <- tidy_genes_in_region %>%
-        dplyr::filter(QTL_INTERVAL_START == QTL_Region_start) %>%
-        dplyr::distinct(CHROM, POS, VARIANT_LOG10p, VARIANT_IMPACT, REF, ALT) %>% 
-        dplyr::mutate(MARKER_pos = paste0(CHROM, POS, " REF:ALT ", REF, ":", ALT))
-    
-    variant_df$VARIANT_IMPACT[is.na(variant_df$VARIANT_IMPACT)] <- "Intergenic"
-    
-    xs <- unique(gene_df$QTL_INTERVAL_START)
-    xe <- unique(gene_df$QTL_INTERVAL_END)
-    gc <- unique(gene_df$CHROM)
-    
-    max_logp <- unique(max(variant_df$VARIANT_LOG10p))/150
-    
-    gene_plot <- ggplot(gene_df) +
-        geom_vline(aes(xintercept = peak_variant/1e6),
-                   linetype=3, color = "cyan")+
-        geom_segment(aes(x = ifelse(STRAND == "Gene_on_plus_strand", TRANSCRIPTION_START_POS/1e6, TRANSCRIPTION_END_POS/1e6),
-                         xend = ifelse(STRAND == "Gene_on_plus_strand", TRANSCRIPTION_END_POS/1e6, TRANSCRIPTION_START_POS/1e6),
-                         y = VARIANT_LOG10p,
-                         yend = VARIANT_LOG10p,
-                         color = STRAND,
-                         plotly_label_gene_name = GENE_NAME,
-                         plotly_label_gene_ID = WBGeneID),
-                     size = 1.5) +
-        geom_segment(data = variant_df,
-                     aes(x = POS/1e6,
-                         xend = POS/1e6,
-                         y = VARIANT_LOG10p+max_logp,
-                         yend = VARIANT_LOG10p-max_logp,
-                         color = VARIANT_IMPACT, 
-                         plotly_label_variant = MARKER_pos)) +
-        scale_color_manual(values = c("Gene_on_plus_strand" = "#3bb5c4",
-                                      "Gene_on_minus_strand" = "#341d8d",
-                                      "MODIFIER" = "gray50",
-                                      "LOW" = "gray30",
-                                      "MODERATE" = "orange",
-                                      "HIGH" = "red",
-                                      "Intergenic" = "gray80"),
-                           name = "Variant Impact")+
-        labs(x = "Genomic Position (Mb)",
-             y = "-log[10]p") +
-        theme_bw(18)+
-        xlim(c(xs/1e6, xe/1e6)) +
-        theme(legend.position = "top",
-              panel.grid = element_blank())
-    
-    
-    # save plot to file
-    # ggsave(gene_plot,
-    #       filename = paste0(trait_name, ".", gc, ".",  xs, ".", xe, "_gene_plot.pdf"),
-    #        height=10, width = 14)
-    
-    
-    # interactive plot
-    ggplotly(gene_plot, tooltip = c("plotly_label_gene_name", "plotly_label_gene_ID", "plotly_label_variant")) %>% toWebGL()
-    
-    
-    # store table for html output
-    gene_list_out <- select(tidy_genes_in_region, MARKER, GENE_NAME, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE, Phenotype_Value) %>% dplyr::slice(1:20)
-    
-    DT::datatable(gene_list_out)
+# for each gene, keep the most significant overlapping variant log10p
+# this is used as y-axix of gene position
+gene_df <- tidy_genes_in_region %>%
+    dplyr::filter(QTL_INTERVAL_START == QTL_Region_start & !is.na(WBGeneID)) %>%
+    dplyr::distinct(MARKER, GENE_NAME, WBGeneID, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p) %>%
+    dplyr::group_by(WBGeneID) %>% 
+    dplyr::summarise(VARIANT_LOG10p = max(VARIANT_LOG10p, na.rm = T)) %>% 
+    dplyr::inner_join(gene_info) %>% 
+    dplyr::mutate(STRAND = ifelse(STRAND=="+", "Gene_on_plus_strand", "Gene_on_minus_strand"))
+
+
+peak_variant <- QTL_Peak
+
+variant_df <- tidy_genes_in_region %>%
+    dplyr::filter(QTL_INTERVAL_START == QTL_Region_start) %>%
+    dplyr::distinct(CHROM, POS, VARIANT_LOG10p, VARIANT_IMPACT, REF, ALT) %>% 
+    dplyr::mutate(MARKER_pos = paste0(CHROM, POS, " REF:ALT ", REF, ":", ALT))
+
+variant_df$VARIANT_IMPACT[is.na(variant_df$VARIANT_IMPACT)] <- "Intergenic"
+
+xs <- unique(gene_df$QTL_INTERVAL_START)
+xe <- unique(gene_df$QTL_INTERVAL_END)
+gc <- unique(gene_df$CHROM)
+
+max_logp <- unique(max(variant_df$VARIANT_LOG10p))/150
+
+gene_plot <- ggplot(gene_df) +
+    geom_vline(aes(xintercept = peak_variant/1e6),
+               linetype=3, color = "cyan")+
+    geom_segment(aes(x = ifelse(STRAND == "Gene_on_plus_strand", TRANSCRIPTION_START_POS/1e6, TRANSCRIPTION_END_POS/1e6),
+                     xend = ifelse(STRAND == "Gene_on_plus_strand", TRANSCRIPTION_END_POS/1e6, TRANSCRIPTION_START_POS/1e6),
+                     y = VARIANT_LOG10p,
+                     yend = VARIANT_LOG10p,
+                     color = STRAND,
+                     plotly_label_gene_name = GENE_NAME,
+                     plotly_label_gene_ID = WBGeneID),
+                 size = 1.5) +
+    geom_segment(data = variant_df,
+                 aes(x = POS/1e6,
+                     xend = POS/1e6,
+                     y = VARIANT_LOG10p+max_logp,
+                     yend = VARIANT_LOG10p-max_logp,
+                     color = VARIANT_IMPACT, 
+                     plotly_label_variant = MARKER_pos)) +
+    scale_color_manual(values = c("Gene_on_plus_strand" = "#3bb5c4",
+                                  "Gene_on_minus_strand" = "#341d8d",
+                                  "MODIFIER" = "gray50",
+                                  "LOW" = "gray30",
+                                  "MODERATE" = "orange",
+                                  "HIGH" = "red",
+                                  "Intergenic" = "gray80"),
+                       name = "Variant Impact")+
+    labs(x = "Genomic Position (Mb)",
+         y = "-log[10]p") +
+    theme_bw(18)+
+    xlim(c(xs/1e6, xe/1e6)) +
+    theme(legend.position = "top",
+          panel.grid = element_blank())
+
+
+# save plot to file
+# ggsave(gene_plot,
+#       filename = paste0(trait_name, ".", gc, ".",  xs, ".", xe, "_gene_plot.pdf"),
+#        height=10, width = 14)
+
+
+# interactive plot
+ggplotly(gene_plot, tooltip = c("plotly_label_gene_name", "plotly_label_gene_ID", "plotly_label_variant")) %>% toWebGL()
+
+
+# store table for html output
+gene_list_out <- select(tidy_genes_in_region, MARKER, GENE_NAME, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE, Phenotype_Value) %>% dplyr::slice(1:20)
+
+DT::datatable(gene_list_out)
 
 
 ```
@@ -584,7 +600,7 @@ ggplotly(pxg_plot, tooltip = c("plotly_label", "y"))
 
 
 ## Please kindly cite the following publications
-* CeNDR paper
+* CeNDR, the Caenorhabditis elegans natural diversity resource. Cook DE, Zdraljevic S, Roberts JP, Andersen EC. Nucleic Acids Res. 2017 Jan 4;45(D1):D650-D657. doi: 10.1093/nar/gkw893.
 * cegwas2 paper
 * divergent region paper
 * haplotype paper

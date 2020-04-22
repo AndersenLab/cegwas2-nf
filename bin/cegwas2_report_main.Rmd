@@ -17,12 +17,10 @@ output:
 * All strain names were converted to the corresponding isotype name, which can be looked up here: https://www.elegansvariation.org/strain/strain_data.tsv
 * This R Markdown file imports data tables within Analysis_Results-Date folder and will knit without any modification.
 <br>
-* It generates plots (almost) identical to the plots in Analysis_Results-Date folder.
-<br>
 * Features for the interactive plots: 
-    * Place mouse on plot region to show related underlying data.
-    * Hold and drag the mouse to select a region to zoom in, double click to reset zoom.
-    * Click on legend to show/hide different data groups.
+    * Place mouse on plot region to show underlying data.
+    * Click and drag to select a region to zoom, double click to reset zoom.
+    * Click on the legend to show/hide different data groups.
 <br>
 * ggsave code is kept for users to make customized plots. 
 <br>
@@ -66,12 +64,12 @@ independent_test_cutoff <- -log10(0.05/independent_tests)
 
 * #### SNVs are colored red if they pass the genome-wide corrected significance threshold:
     * If Bonferroni-corrected significance (BF) threshold were used: the horizontal solid line corresponds to BF threshold, and the horizontal dash line corresponds to EIGEN threshold (see below). If user supplied threshold exists, it will replace the BF threshold.
-    * If Eigen-decomposition significance threshold were used: the horizontal solid line overlaps with the dash line and corresponds to the EIGEN threshold, which corrects for the number of independent markers in your data set.
+    * If Eigen-decomposition significance threshold were used, the horizontal solid line overlaps with the dash line and corresponds to the EIGEN threshold, which corrects for the number of independent markers in your data set.
 
 * #### Light blue regions are QTL confidence intervals. These regions have separate report pages with links below.
 
 
-```{r, fig.height=3.5, fig.width=12, out.height=350, out.width=1000}
+```{r, fig.height=3.5, fig.width=12}
 # load processed mapping data. 
 # Note that readr::read_delim will throw parsing errors and put NA in rows that contain actual values in strain/value/allele/var.exp so did not use it
 processed_mapping <- read.delim(paste0("Mappings/Data/",trait_name,"_processed_mapping.tsv"), stringsAsFactors=FALSE)
@@ -206,7 +204,7 @@ DT::datatable(QTL_peaks_original)
 <br>
 <br>
 
-## Pair-wish linkage between QTL regions by R square
+## Pairwise linkage between QTL regions by R square
 ```{r, fig.width=6, fig.height=4, eval=whether_plot_LD}
 ldcalc <- read.table(file = paste0("Mappings/Data/", trait_name, "_LD_between_QTL_regions.tsv"), header = T) %>% as.matrix()
 
@@ -240,7 +238,7 @@ print("Not enough QTL regions to calculate linkage")
 <br>
 <br>
 
-## Divergent region, haplotype and fine mapping for each significant QTL region 
+## Divergent region, haplotype, and fine mapping for each significant QTL region 
 Only for regions less than 1.5Mb in size
 
 ```{r, results='asis', eval=whether_fine_map}
@@ -268,7 +266,7 @@ print("No significant QTL regions to plot")
 
 ## Burden mapping plots
 
-#### Every dot represents a gene, red color indicates significance based on corresponding test.
+Every dot represents a gene, red color indicates significance based on a corresponding test.
 <br>
 <br>
 
@@ -410,7 +408,7 @@ DT::datatable(both_sig, escape = FALSE)
 <br>
 
 ## Please kindly cite the following publications
-* CeNDR paper
+* CeNDR, the Caenorhabditis elegans natural diversity resource. Cook DE, Zdraljevic S, Roberts JP, Andersen EC. Nucleic Acids Res. 2017 Jan 4;45(D1):D650-D657. doi: 10.1093/nar/gkw893.
 * cegwas2 paper
 * divergent region paper
 * haplotype paper
