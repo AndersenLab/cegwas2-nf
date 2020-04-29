@@ -161,155 +161,147 @@ all_QTL_bins <- read.delim("Divergent_and_haplotype/all_QTL_bins.bed", header=FA
 
 
 ```{r}
-# makes sure do this after checking QTL_peaks exist, otherwise if all_QTL_div.bed is empty, could also be there is no peak
-if (file.info("Divergent_and_haplotype/all_QTL_bins.bed")$size!=0) {
+# take genomic 1kb bins within the QTL region
+# format to the same as div regions
+# during spread, this "all_bins" will dictate number of rows in resulting dataframe
+region_QTL_bins <- filter(all_QTL_bins, V1==QTL_Chrom & V2 > QTL_Region_start & V3 < QTL_Region_end ) %>% mutate(V4="all_bins", V5=0)
+
+
+# if any of user supplied strains have divergent region with the QTL region
+if (file.info("Divergent_and_haplotype/all_QTL_div.bed")$size!=0) {
     
-    # take genomic 1kb bins within the QTL region
-    # format to the same as div regions
-    # during spread, this "all_bins" will dictate number of rows in resulting dataframe
-    region_QTL_bins <- filter(all_QTL_bins, V1==QTL_Chrom & V2 > QTL_Region_start & V3 < QTL_Region_end ) %>% mutate(V4="all_bins", V5=0)
+    all_QTL_div <- read.delim("Divergent_and_haplotype/all_QTL_div.bed", header=FALSE, stringsAsFactors=FALSE)
     
-    
-    # if any of user supplied strains have divergent region with the QTL region
-    if (file.info("Divergent_and_haplotype/all_QTL_div.bed")$size!=0) {
-        
-        all_QTL_div <- read.delim("Divergent_and_haplotype/all_QTL_div.bed", header=FALSE, stringsAsFactors=FALSE)
-        
-    } else {
-        # create an empty dataframe
-        all_QTL_div <- data.frame(V1=character(),
-                                  V2=integer(), 
-                                  V3=integer(), 
-                                  V4=character(), 
-                                  V5=integer(), 
-                                  stringsAsFactors=FALSE)
-    }
-    
-    
-    strain_QTL_div <- dplyr::filter(all_QTL_div, V4 %in% user_strain_pheno_list$strain)
-    
-    
-    # take divergent bins within the QTL region, for all user tested strains
-    # append all_bins within QTL region to the QTL_div 
-    # spread to short form so each strain is a column, each bin in QTL region is a row, all bins are included.
-    region_QTL_div <- filter(strain_QTL_div, V1==QTL_Chrom & V2 > QTL_Region_start & V3 < QTL_Region_end ) %>%
-        dplyr::bind_rows(region_QTL_bins)  %>% 
-        tidyr::spread(V4, V5, fill=0) %>% 
-        select(-all_bins)
-    
-    # add back user-tested strains that have divergent data but are not divergent within the QTL peak region, therefore left out in previous step
-    w_div_data_strain_missed <- w_div_data_strain$strain[!(w_div_data_strain$strain %in% names(region_QTL_div))]
-    
-    
-    for (x in w_div_data_strain_missed)
-    {
-        region_QTL_div[[x]] <- 0
-    }
-    
-    
-    # add back user-tested strains that have no divergent data
-    for (x in no_data_strain$strain)
-    {
-        region_QTL_div[[x]] <- -1
-    }
-    
-    
-    # check that all user-tested strains are include now
-    if (ncol(region_QTL_div) - 3 != nrow(user_strain_pheno_list))
-    { print("strain number don't match!!!") }
-    
-    
-    m <- as.matrix(select(region_QTL_div,-V1,-V2,-V3))
-    
-    # transpose to the format that heatmap needs
-    m2 <- t(m)
-    colnames(m2) <- region_QTL_div$V2
-    
-    
-    # add REF/ALT annotation
-    ref_alt <- filter(processed_mapping, peakPOS == QTL_Peak) %>% select(strain, allele) %>% filter(strain %in% row.names(m2))
-    
-    alt_count <- data.frame(table(ref_alt$allele)) %>% filter(Var1==1)
-    ref_count <- data.frame(table(ref_alt$allele)) %>% filter(Var1==-1)
-    
-    ref_alt <- mutate(ref_alt, geno_group = ifelse(allele==1, "ALT", "REF"))  %>% mutate(geno_group_count = ifelse(allele==1, paste0("ALT(", alt_count[1,2], ")"), paste0("REF(", ref_count[1,2], ")"))) %>% select(-allele)
-    
-    # make sure REF/ALT annotation is in the same order as row.names(m2)
-    # that's how complexHeatmap combine them
-    ref_alt_annotation <- data.frame(strain=row.names(m2)) %>% left_join(ref_alt, by=c("strain" = "strain"))
-    
-    
-    # add div and write out table
-    # this corresponds to the sort order of rows for heatmap
-    peak_bin <- floor(QTL_Peak/1000)*1000
-    ref_alt_annotation <- mutate(ref_alt_annotation, is_div = m2[strain, as.character(peak_bin)])
-    
-    
-    # decide whether there is enough strains with divergent region to split phenotype genotype plot
-    if (nrow(filter(ref_alt_annotation, is_div == 1)) > nrow(ref_alt_annotation)/20 ) {
-        split_by_div = TRUE
-    } else { split_by_div = FALSE }
-    
-    ######################### make the plot
-    # set color for heatmap
-    colors <- structure(c("indianred1","grey90","dodgerblue3"), names = c("1", "0", "-1")) 
-    
-    # keep only existing groups for legend
-    legend_mapping <- data.frame(div_group=c(0, 1, -1), div_label=c("not divergent", "divergent from N2", "no divergent data" )) %>% filter(div_group %in% unique(c(m2)))
-    
-    # create x-axis label
-    x_axis_start <- colnames(m2)[1]
-    x_axis_peak <- round(QTL_Peak, digits = -3)
-    x_axis_end <- colnames(m2)[ncol(m2)]
-    
-    genomic_coor_text <- as.numeric(colnames(m2))
-    genomic_coor_text[!genomic_coor_text %in% c(x_axis_start,x_axis_peak, x_axis_end)] <- ""
-    
-    x_axis_label <- HeatmapAnnotation(
-        year = anno_text(genomic_coor_text, rot = 0, location = unit(1, "npc"), just = "top"))
-    
-    # add empty space on top of plot so the text "peak" will be within plottin area and show
-    peak_label_space <- HeatmapAnnotation(foo = anno_empty(border = FALSE, height = unit(1, "cm")))
-    
-    
-    ht <- Heatmap(m2, name="div_region",
-                  row_split=factor(ref_alt_annotation$geno_group_count,
-                                   levels=c(paste0("REF(", ref_count[1,2], ")"), paste0("ALT(", alt_count[1,2], ")"))), row_gap = unit(3, "mm"),
-                  cluster_columns = FALSE, 
-                  show_row_dend = FALSE, 
-                  cluster_row_slices=FALSE, 
-                  col = colors, 
-                  heatmap_legend_param = list( title="",
-                                               at = legend_mapping$div_group,
-                                               labels = as.character(legend_mapping$div_label)),
-                  show_column_names = FALSE,
-                  show_row_names = FALSE,
-                  bottom_annotation = x_axis_label,
-                  top_annotation = peak_label_space)
-    
-    draw(ht)
-    
-    decorate_heatmap_body("div_region", {
-        i = which(colnames(m2) == round(QTL_Peak, digits = -3))
-        x = i/ncol(m2)
-        grid.lines(c(x, x), c(0, 1), gp = gpar(lwd = 2, lty = 2))
-        grid.text("QTL peak", x, unit(1, "npc") + unit(5, "mm"))
-    }, row_slice=1)
-    
-    decorate_heatmap_body("div_region", {
-        i = which(colnames(m2) == round(QTL_Peak, digits = -3))
-        x = i/ncol(m2)
-        grid.lines(c(x, x), c(0, 1), gp = gpar(lwd = 2, lty = 2))
-    }, row_slice=2)
-    
-    #dev.copy(pdf,'divergent_regions.pdf')
-    #dev.off()
-    
-} else { 
-    
-    print("Good news: no QTL regions are within KNOWN divergent regions (relative to N2) in any of the user-tested strains")
-    
+} else {
+    # create an empty dataframe
+    all_QTL_div <- data.frame(V1=character(),
+                              V2=integer(), 
+                              V3=integer(), 
+                              V4=character(), 
+                              V5=integer(), 
+                              stringsAsFactors=FALSE)
 }
+
+
+strain_QTL_div <- dplyr::filter(all_QTL_div, V4 %in% user_strain_pheno_list$strain)
+
+
+# take divergent bins within the QTL region, for all user tested strains
+# append all_bins within QTL region to the QTL_div 
+# spread to short form so each strain is a column, each bin in QTL region is a row, all bins are included.
+region_QTL_div <- filter(strain_QTL_div, V1==QTL_Chrom & V2 > QTL_Region_start & V3 < QTL_Region_end ) %>%
+    dplyr::bind_rows(region_QTL_bins)  %>% 
+    tidyr::spread(V4, V5, fill=0) %>% 
+    select(-all_bins)
+
+# add back user-tested strains that have divergent data but are not divergent within the QTL peak region, therefore left out in previous step
+w_div_data_strain_missed <- w_div_data_strain$strain[!(w_div_data_strain$strain %in% names(region_QTL_div))]
+
+
+for (x in w_div_data_strain_missed)
+{
+    region_QTL_div[[x]] <- 0
+}
+
+
+# add back user-tested strains that have no divergent data
+for (x in no_data_strain$strain)
+{
+    region_QTL_div[[x]] <- -1
+}
+
+
+# check that all user-tested strains are include now
+if (ncol(region_QTL_div) - 3 != nrow(user_strain_pheno_list))
+{ print("strain number don't match!!!") }
+
+
+m <- as.matrix(select(region_QTL_div,-V1,-V2,-V3))
+
+# transpose to the format that heatmap needs
+m2 <- t(m)
+colnames(m2) <- region_QTL_div$V2
+
+
+# add REF/ALT annotation
+ref_alt <- filter(processed_mapping, peakPOS == QTL_Peak) %>% select(strain, allele) %>% filter(strain %in% row.names(m2))
+
+alt_count <- data.frame(table(ref_alt$allele)) %>% filter(Var1==1)
+ref_count <- data.frame(table(ref_alt$allele)) %>% filter(Var1==-1)
+
+ref_alt <- mutate(ref_alt, geno_group = ifelse(allele==1, "ALT", "REF"))  %>% mutate(geno_group_count = ifelse(allele==1, paste0("ALT(", alt_count[1,2], ")"), paste0("REF(", ref_count[1,2], ")"))) %>% select(-allele)
+
+# make sure REF/ALT annotation is in the same order as row.names(m2)
+# that's how complexHeatmap combine them
+ref_alt_annotation <- data.frame(strain=row.names(m2)) %>% left_join(ref_alt, by=c("strain" = "strain"))
+
+
+# add div and write out table
+# this corresponds to the sort order of rows for heatmap
+peak_bin <- floor(QTL_Peak/1000)*1000
+ref_alt_annotation <- mutate(ref_alt_annotation, is_div = m2[strain, as.character(peak_bin)])
+
+
+# decide whether there is enough strains with divergent region to split phenotype genotype plot
+if (nrow(filter(ref_alt_annotation, is_div == 1)) > nrow(ref_alt_annotation)/20 ) {
+    split_by_div = TRUE
+} else { split_by_div = FALSE }
+
+######################### make the plot
+# set color for heatmap
+colors <- structure(c("indianred1","grey90","dodgerblue3"), names = c("1", "0", "-1")) 
+
+# keep only existing groups for legend
+legend_mapping <- data.frame(div_group=c(0, 1, -1), div_label=c("not divergent", "divergent from N2", "no divergent data" )) %>% filter(div_group %in% unique(c(m2)))
+
+# create x-axis label
+x_axis_start <- colnames(m2)[1]
+x_axis_peak <- round(QTL_Peak, digits = -3)
+x_axis_end <- colnames(m2)[ncol(m2)]
+
+genomic_coor_text <- as.numeric(colnames(m2))
+genomic_coor_text[!genomic_coor_text %in% c(x_axis_start,x_axis_peak, x_axis_end)] <- ""
+
+x_axis_label <- HeatmapAnnotation(
+    year = anno_text(genomic_coor_text, rot = 0, location = unit(1, "npc"), just = "top"))
+
+# add empty space on top of plot so the text "peak" will be within plottin area and show
+peak_label_space <- HeatmapAnnotation(foo = anno_empty(border = FALSE, height = unit(1, "cm")))
+
+
+ht <- Heatmap(m2, name="div_region",
+              row_split=factor(ref_alt_annotation$geno_group_count,
+                               levels=c(paste0("REF(", ref_count[1,2], ")"), paste0("ALT(", alt_count[1,2], ")"))), row_gap = unit(3, "mm"),
+              cluster_columns = FALSE, 
+              show_row_dend = FALSE, 
+              cluster_row_slices=FALSE, 
+              col = colors, 
+              heatmap_legend_param = list( title="",
+                                           at = legend_mapping$div_group,
+                                           labels = as.character(legend_mapping$div_label)),
+              show_column_names = FALSE,
+              show_row_names = FALSE,
+              bottom_annotation = x_axis_label,
+              top_annotation = peak_label_space)
+
+draw(ht)
+
+decorate_heatmap_body("div_region", {
+    i = which(colnames(m2) == round(QTL_Peak, digits = -3))
+    x = i/ncol(m2)
+    grid.lines(c(x, x), c(0, 1), gp = gpar(lwd = 2, lty = 2))
+    grid.text("QTL peak", x, unit(1, "npc") + unit(5, "mm"))
+}, row_slice=1)
+
+decorate_heatmap_body("div_region", {
+    i = which(colnames(m2) == round(QTL_Peak, digits = -3))
+    x = i/ncol(m2)
+    grid.lines(c(x, x), c(0, 1), gp = gpar(lwd = 2, lty = 2))
+}, row_slice=2)
+
+#dev.copy(pdf,'divergent_regions.pdf')
+#dev.off()
+
 
 ```
 
