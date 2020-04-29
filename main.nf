@@ -882,11 +882,11 @@ process html_region_prep_table {
   """
   cat QTL_peaks.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
 
-  bedtools intersect -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed > all_QTL_bins.bed
+  bedtools intersect -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | uniq > all_QTL_bins.bed
 
-  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed > all_QTL_div.bed
+  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed | uniq > all_QTL_div.bed
 
-  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo > haplotype_in_QTL_region.txt
+  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo | uniq > haplotype_in_QTL_region.txt
 
   cp ${workflow.projectDir}/bin/div_isotype_list.txt . 
 
