@@ -911,7 +911,7 @@ each TRAIT could have multiple peaks. Each peak have 1 process.
 */
 
 html_report_peaks
-  .combine(gene_plts)
+  .join(gene_plts)
   .set{input_for_region}
 
 
@@ -924,7 +924,7 @@ process html_report_region {
 	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
 
 	input:
-    set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(t), file(a), file(b) from input_for_region
+    set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(a), file(b) from input_for_region
     set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_strain_list.txt") from div_hap_table
 
 
