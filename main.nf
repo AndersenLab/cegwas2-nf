@@ -911,7 +911,7 @@ each TRAIT could have multiple peaks. Each peak have 1 process.
 */
 
 html_report_peaks
-  .join(gene_plts)
+  .combine(gene_plts, by: 0)
   .set{input_for_region}
 
 
