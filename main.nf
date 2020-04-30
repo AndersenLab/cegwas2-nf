@@ -724,6 +724,7 @@ process plot_genes {
 
 	output:
 		set val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
+    val(TRAIT) into gene_plts_done
 
 	"""
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_genes.R > plot_genes.R
@@ -877,6 +878,8 @@ process html_region_prep_table {
     file("QTL_peaks.tsv") from qtl_peaks2
   output:
     set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_isotype_list.txt") into div_hap_table
+    val true into html_region_prep_table_done
+
 
 
   """
@@ -910,23 +913,23 @@ qtl_peaks1
 each TRAIT could have multiple peaks. Each peak have 1 process.
 */
 
+
 html_report_peaks
-  .combine(gene_plts, by: 0)
+  .combine(gene_plts_done, by: 0)
+  .combine(html_region_prep_table_done)
   .set{input_for_region}
 
 
 process html_report_region {
 
-	tag {TRAIT}
+	tag "$TRAIT $CHROM $peak_pos"
   memory '20 GB'
 
 	publishDir "${params.out}", mode: 'copy', pattern: "*.Rmd"
 	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
 
 	input:
-    set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(a), file(b) from input_for_region
-    set file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_strain_list.txt") from div_hap_table
-
+    set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(gene_plt_done), val(div_done) from input_for_region
 
 	output:
 		set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") optional true into html_rmd_report
