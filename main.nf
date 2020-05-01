@@ -482,6 +482,7 @@ process summarize_maps {
 	output:
 	file("*.pdf") into summarized_plot
 	file("QTL_peaks.tsv") into qtl_peaks
+  val true into qtl_peaks_done
 
 
 	"""
@@ -831,6 +832,7 @@ val(TRAIT) into linkage_done
 
 burden_plots
   .join(linkage_done)
+  .combine(qtl_peaks_done)
   .set{ input_for_main }
 
 
@@ -844,7 +846,7 @@ process html_report_main {
 
 
   input:
-    set val(TRAIT), file(a), file(b) from input_for_main
+    set val(TRAIT), file(a), file(b), val(peaks_done) from input_for_main
 
   output:
     set file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") into report_main
@@ -885,11 +887,11 @@ process html_region_prep_table {
   """
   cat QTL_peaks.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
 
-  bedtools intersect -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | uniq > all_QTL_bins.bed
+  bedtools intersect -wa -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_bins.bed
 
-  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed | uniq > all_QTL_div.bed
+  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_div.bed
 
-  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo | uniq > haplotype_in_QTL_region.txt
+  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo | sort -k1,1 -k2,2n | uniq > haplotype_in_QTL_region.txt
 
   cp ${workflow.projectDir}/bin/div_isotype_list.txt . 
 
