@@ -713,7 +713,7 @@ genes
 process plot_genes {
 
 	cpus 1
-	memory '32 GB'
+	memory '64 GB'
 
 	tag {phenotype}
 
@@ -926,6 +926,8 @@ process html_report_region {
 
 	tag "$TRAIT $CHROM $peak_pos"
   memory '20 GB'
+
+  errorStrategy 'ignore'
 
 	publishDir "${params.out}", mode: 'copy', pattern: "*.Rmd"
 	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
