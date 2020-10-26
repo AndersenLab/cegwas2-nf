@@ -476,6 +476,9 @@ process summarize_maps {
 	publishDir "${params.out}/Mappings/Plots", mode: 'copy', pattern: "*mappings.pdf"
 	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*_peaks.tsv"
 
+    memory { 16.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
+
 	input:
 	file(maps) from processed_map_to_summary_plot.collect()
 
@@ -631,10 +634,11 @@ process prep_ld_files {
 
 process rrblup_fine_maps {
 
+  errorStrategy { task.attempt == 3 ? 'ignore' : 'retry' }
+
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_finemap_plot.pdf"
 	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*_prLD_df.tsv"
 	tag {"${TRAIT} ${CHROM}:${start_pos}-${end_pos}"}
-
 
 	input:
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
@@ -713,7 +717,8 @@ genes
 process plot_genes {
 
 	cpus 1
-	memory '64 GB'
+    memory { 32.GB * task.attempt }
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
 
 	tag {phenotype}
 
@@ -839,8 +844,11 @@ burden_plots
 process html_report_main {
 
   executor 'local'
+  errorStrategy 'ignore'
 
   tag {TRAIT}
+  memory '16 GB'
+  
 
   publishDir "${params.out}", mode: 'copy'
 
