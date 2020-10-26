@@ -214,9 +214,9 @@ process fix_strain_names_bulk {
 
 	"""
 		# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
-		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
+		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk_new.R > Fix_Isotype_names_bulk_new.R 
 
-		Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names}
+		Rscript --vanilla Fix_Isotype_names_bulk_new.R ${phenotypes} ${params.vcf}
 	"""
 
 }
