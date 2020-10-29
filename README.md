@@ -3,13 +3,15 @@
 - Use this branch if you're screening lots of traits.
 - Will only run the main mapping step and write out manhattan plots, pheno-geno plots and the underlying tables.
 - Errors will be ignored to let all traits finish. 
-- Uses docker container andersenlab/cegwas2:latest.
+- Uses docker container andersenlab/cegwas2:latest. 
+- On Quest need `module add singularity`
 
 ### report branch
 - Use this branch if you only have a few traits.
 - Will generate html report containing all plots in interactive formats for each trait and each QTL.  
 - If one downloads the "Analysis-Results-data" folder, the Rmarkdown files should knit without any modifications (given all libraries are installed).
-- The environment is set up via Conda and module/R.3.6.0 on Quest b/c I couldn't build 1 required package into the docker container.
+- The environment is set up via Conda and module/R.3.6.0 on Quest b/c I couldn't build 1 required package into the docker container. 
+- On Quest need `module add python/anaconda`. Module for R is set up in nextflow.config.
 
 ### master branch
 - Left unchanged since 2019 Stefan's commit. In case need to reproduce results.
