@@ -8,7 +8,8 @@
 
 ### report branch
 - Use this branch if you only have a few traits.
-- Will generate html report containing all plots in interactive formats for each trait and each QTL.  
+- Will generate html report containing all plots in interactive formats for each trait and each QTL. 
+- Fine mapping will use gene annotation in vcf, whereas burden mapping uses annotation WS245 in /bin, which have some differences.
 - If one downloads the "Analysis-Results-data" folder, the Rmarkdown files should knit without any modifications (given all libraries are installed).
 - The environment is set up via Conda and module/R.3.6.0 on Quest b/c I couldn't build 1 required package into the docker container. 
 - On Quest need `module add python/anaconda`. Module for R is set up in nextflow.config.
