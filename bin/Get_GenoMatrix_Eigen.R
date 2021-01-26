@@ -1,6 +1,7 @@
 library(Rcpp)
 library(tidyverse)
-library(coop)
+#library(coop)
+library(correlateR)
 library(RSpectra)
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -50,7 +51,8 @@ for(chrom in 1:length(chrom_geno)){
     
     print(glue::glue("Testing {test_eigenvalues} Eigenvalues"))
     
-    snpcor <- coop::pcor(t(chrom_geno[[chrom]]))
+    #snpcor <- coop::pcor(t(chrom_geno[[chrom]]))
+    snpcor <- correlateR::cor(t(chrom_geno[[chrom]]))
     snpeigen <- Rspectra::eigs_sym(snpcor, test_eigenvalues, opts = list(retvec = FALSE))
     snpeigen$values[snpeigen$values>1] <- 1
     
