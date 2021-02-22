@@ -52,9 +52,7 @@ trait_name <- "TRAIT_NAME_HOLDER"
 # load independent tests result
 total_independent_tests <- read.table("Genotype_Matrix/total_independent_tests.txt", quote="\"", comment.char="", stringsAsFactors=FALSE)
 
-independent_tests <- total_independent_tests[[1]]
-
-independent_test_cutoff <- -log10(0.05/independent_tests)
+independent_test_cutoff <- -log10(0.05/total_independent_tests[[1]])
 
 ```
 
@@ -90,8 +88,8 @@ if(num_traits > 1){
 manhattan_plot <- processed_mapping %>%
     dplyr::filter(trait == unique(processed_mapping$trait)[1] & CHROM != "MtDNA") %>%
     dplyr::distinct(marker, .keep_all = T) %>%
-    dplyr::mutate(EIGEN_CUTOFF = independent_test_cutoff) %>%
-    dplyr::mutate(EIGEN_SIG = ifelse(log10p > BF, "1", 
+    dplyr::mutate(EIGEN_CUTOFF = independent_test_cutoff,
+                  EIGEN_SIG = ifelse(log10p > BF, "1", 
                                      ifelse(log10p > EIGEN_CUTOFF, "2", "0")) )%>%
     ggplot2::ggplot(.) +
     ggplot2::aes(x = POS/1e6, y = log10p) +
@@ -114,8 +112,8 @@ manhattan_plot <- processed_mapping %>%
                         alpha = .75,  
                         size = 1,
                         linetype = 2) +
-    ggplot2::geom_point( ggplot2::aes(color= factor(EIGEN_SIG)) ) +
-    ggplot2::facet_grid( . ~ CHROM, scales = "free_x" , space = "free_x") +
+    ggplot2::geom_point(ggplot2::aes(color= factor(EIGEN_SIG)) ) +
+    ggplot2::facet_grid(. ~ CHROM, scales = "free_x" , space = "free_x") +
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
                    axis.text.y = ggplot2::element_text(size = 16),
@@ -152,13 +150,13 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
     whether_print_peaks <- TRUE
         
     QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
-        dplyr::filter(V1==trait_name)  %>% 
-        dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) 
+        dplyr::filter(V1 == trait_name)  %>% 
+        dplyr::rename(Trait = V1, Chrom = V2, Region_start = V3, Peak = V4, Region_end = V5) 
     
     
     if (nrow(QTL_peaks) < 2) { 
         whether_plot_LD <- FALSE 
-        } else { whether_plot_LD <- TRUE }
+    } else { whether_plot_LD <- TRUE }
     
     
     if (nrow(QTL_peaks)==0) {
@@ -168,7 +166,9 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
     } else {
 
 
-        QTL_peaks <- dplyr::mutate(QTL_peaks, Region_width=Region_end - Region_start) %>% dplyr::filter(Region_width < 1500000)
+        QTL_peaks <- QTL_peaks %>%
+            dplyr::mutate(Region_width = Region_end - Region_start) %>% 
+            dplyr::filter(Region_width < 3000000)
         
         if (nrow(QTL_peaks)==0) {
             print("Significant QTL regions are too wide for plotting")
@@ -194,8 +194,8 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 # this doesn't print within if{}
 # QTL_peaks was filtered in previous chunk, so reload
 QTL_peaks_original <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
-        dplyr::filter(V1==trait_name)  %>% 
-        dplyr::rename(Trait=V1, Chrom=V2, Region_start=V3, Peak=V4, Region_end=V5) 
+        dplyr::filter(V1 == trait_name)  %>% 
+        dplyr::rename(Trait = V1, Chrom = V2, Region_start = V3, Peak = V4, Region_end = V5) 
 
 DT::datatable(QTL_peaks_original)
 
@@ -206,11 +206,14 @@ DT::datatable(QTL_peaks_original)
 
 ## Pairwise linkage between QTL regions by R square
 ```{r, fig.width=6, fig.height=4, eval=whether_plot_LD}
-ldcalc <- read.table(file = paste0("Mappings/Data/", trait_name, "_LD_between_QTL_regions.tsv"), header = T) %>% as.matrix()
+ldcalc <- read.table(file = paste0("Mappings/Data/", trait_name, "_LD_between_QTL_regions.tsv"), header = T) %>% 
+    as.matrix()
 
 # convert to long format for ggplot
-LDs <- tbl_df(data.frame(ldcalc) %>% dplyr::add_rownames(var = "SNP1")) %>%
-    tidyr::gather(SNP2, r2, -SNP1) %>% dplyr::arrange(SNP1) %>%
+LDs <- dplyr::tbl_df(data.frame(ldcalc) %>% 
+                          dplyr::add_rownames(var = "SNP1")) %>%
+    tidyr::gather(SNP2, r2, -SNP1) %>% 
+    dplyr::arrange(SNP1) %>%
     tidyr::separate(SNP1, sep = "_", into = c("CHROM1","POS1"), remove = F) %>%
     dplyr::arrange(CHROM1, as.numeric(POS1))
 
@@ -224,8 +227,9 @@ ldplot <- ggplot2::ggplot(LDs) +
                    axis.title.x = ggplot2::element_blank(),
                    axis.title.y = ggplot2::element_blank(),
                    legend.position = "none") +
-    scale_x_discrete(labels = function(x) { gsub("_", ":", x) }, expand = c(0, 0)) + 
-    scale_y_discrete(position = "right", labels = function(x) { gsub("_", ":", x) }, expand = c(0, 0)) + scale_fill_continuous(high = "indianred", low = "white", na.value = "white")
+    ggplot2::scale_x_discrete(labels = function(x) { gsub("_", ":", x) }, expand = c(0, 0)) + 
+    ggplot2::scale_y_discrete(position = "right", labels = function(x) { gsub("_", ":", x) }, expand = c(0, 0)) + 
+    ggplot2::scale_fill_continuous(high = "indianred", low = "white", na.value = "white")
 
 ldplot
 ```
@@ -319,9 +323,9 @@ ggplotly(skat_plot, tooltip = c("plotly_label_geneID","y")) %>% toWebGL()
 
 # show table in html output. 
 # Pvalue is the y-axis in plot
-skat_link <- filter(skat, significant == TRUE) %>% 
-    mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
-    select(Gene_ID, RANGE, Stat, significant)  
+skat_link <- dplyr::filter(skat, significant == TRUE) %>% 
+    dplyr::mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
+    dplyr::select(Gene_ID, RANGE, Stat, significant)  
 
 DT::datatable(skat_link, escape = FALSE)
 ```
@@ -337,23 +341,23 @@ benreg_burden <- read.delim(paste0("BURDEN/VT/Data/", trait_name, ".VariableThre
 benreg_burden$Gene <- as.character(benreg_burden$Gene)
 benreg_burden$RANGE <- as.character(benreg_burden$RANGE)
 
-benreg_burden<-benreg_burden%>%
+benreg_burden <- benreg_burden%>%
     dplyr::rowwise()%>%
     dplyr::mutate(CHROM = strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][1],
                   POS = as.numeric(strsplit(strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][2],split = "-")[[1]][1]),
                   endPOS = as.numeric(strsplit(strsplit(strsplit(RANGE,split = ",")[[1]][1],split = ":")[[1]][2],split = "-")[[1]][2]))%>%
     dplyr::mutate(size = abs(POS-endPOS)) %>%
-    ungroup()%>%
+    dplyr::ungroup()%>%
     dplyr::mutate(significant = ifelse(PermPvalue < .05/n(), TRUE,FALSE ))%>%
     dplyr::filter(CHROM!="MtDNA",NumVar>1,size >500)
 
-burden_manplot <- benreg_burden%>%
-    ggplot()+
-    aes(x = POS/1e6, y = Stat, size = NumVar, alpha = 0.5, color = significant, plotly_label_geneID = Gene) +
-    geom_point(size = 0.8)+
-    scale_color_manual(values=c("black","red"))+
-    facet_grid(.~CHROM, scales = "free", space = "free")+
-    theme_bw()+
+burden_manplot <- benreg_burden %>%
+    ggplot2::ggplot()+
+    ggplot2::aes(x = POS/1e6, y = Stat, size = NumVar, alpha = 0.5, color = significant, plotly_label_geneID = Gene) +
+    ggplot2::geom_point(size = 0.8)+
+    ggplot2::scale_color_manual(values=c("black","red"))+
+    ggplot2::facet_grid(.~CHROM, scales = "free", space = "free")+
+    ggplot2::theme_bw()+
     ggplot2::theme_bw() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
                    axis.text.y = ggplot2::element_text(size = 16),
@@ -365,7 +369,7 @@ burden_manplot <- benreg_burden%>%
                    panel.background = ggplot2::element_rect(color = "black",size = 1.2),
                    legend.position = "none",
                    strip.background = element_blank())+
-    labs(x = "Genomic Position (Mb)", y = "Test Statisitic")
+    ggplot2::labs(x = "Genomic Position (Mb)", y = "Test Statisitic")
 
 # save plot to file
 # ggsave(filename = paste0(trait_name, "_VTprice.pdf"), 
@@ -376,14 +380,14 @@ burden_manplot <- benreg_burden%>%
 
 # show plot in html output
 # print(burden_manplot)
-ggplotly(burden_manplot, tooltip = c("plotly_label_geneID","y")) %>% toWebGL()
+plotly::ggplotly(burden_manplot, tooltip = c("plotly_label_geneID","y")) %>% toWebGL()
 
 
 # show table in html output. 
 # Stat is the y-axis in plot. what is it??
-benreg_burden_link <- filter(benreg_burden, significant == TRUE) %>% 
-    mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
-    select(Gene_ID, RANGE, Stat, significant)  
+benreg_burden_link <- dplyr::filter(benreg_burden, significant == TRUE) %>% 
+    dplyr::mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
+    dplyr::select(Gene_ID, RANGE, Stat, significant)  
 
 DT::datatable(benreg_burden_link, escape = FALSE)
 ```
@@ -393,13 +397,15 @@ DT::datatable(benreg_burden_link, escape = FALSE)
 
 + ### Genes significant in both statistical tests 
 ```{r}
-skat_sig <- dplyr::filter(skat, significant == TRUE) %>% dplyr::rename(SKAT_stat = Stat)
+skat_sig <- dplyr::filter(skat, significant == TRUE) %>% 
+    dplyr::rename(SKAT_stat = Stat)
 
-benreg_burden_sig <- dplyr::filter(benreg_burden, significant == TRUE)  %>% dplyr::rename(VariableThreshold_stat = Stat)
+benreg_burden_sig <- dplyr::filter(benreg_burden, significant == TRUE)  %>% 
+    dplyr::rename(VariableThreshold_stat = Stat)
 
-both_sig <- inner_join(skat_sig, benreg_burden_sig, by=c("Gene","RANGE")) %>% 
-    mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
-    select(Gene_ID, RANGE, SKAT_stat, VariableThreshold_stat)  
+both_sig <- dplyr::inner_join(skat_sig, benreg_burden_sig, by=c("Gene","RANGE")) %>% 
+    dplyr::mutate(Gene_ID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', Gene, '>', Gene,'</a>' ) ) %>%
+    dplyr::select(Gene_ID, RANGE, SKAT_stat, VariableThreshold_stat)  
 
 DT::datatable(both_sig, escape = FALSE) 
 ```
@@ -408,9 +414,9 @@ DT::datatable(both_sig, escape = FALSE)
 <br>
 
 ## Please kindly cite the following publications
-* CeNDR, the Caenorhabditis elegans natural diversity resource. Cook DE, Zdraljevic S, Roberts JP, Andersen EC. Nucleic Acids Res. 2017 Jan 4;45(D1):D650-D657. doi: 10.1093/nar/gkw893.
-* cegwas2 paper
-* divergent region paper
+* Cook, D.E., Zdraljevic, S., Roberts, J.P., and Andersen, E.C. (2016). CeNDR, the Caenorhabditis elegans natural diversity resource. Nucleic Acids Res.
+* Zdraljevic, S., Fox, B.W., Strand, C., Panda, O., Tenjo, F.J., Brady, S.C., Crombie, T.A., Doench, J.G., Schroeder, F.C., and Andersen, E.C. (2019). Natural variation in C. elegans arsenic toxicity is explained by differences in branched chain amino acid metabolism. Elife 8.
+* Lee, D., Zdraljevic, S., Stevens, L., Wang, Y., Tanny, R.E., Crombie, T.A., Cook, D.E., Webster, A.K., Chirakar, R., Ryan Baugh, L., et al. (2020). Balancing selection maintains ancient genetic diversity in C. elegans.
 * haplotype paper
 
 <br>
