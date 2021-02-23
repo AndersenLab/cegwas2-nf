@@ -168,7 +168,7 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
         QTL_peaks <- QTL_peaks %>%
             dplyr::mutate(Region_width = Region_end - Region_start) %>% 
-            dplyr::filter(Region_width < 3000000)
+            dplyr::filter(Region_width < 1500000)
         
         if (nrow(QTL_peaks)==0) {
             print("Significant QTL regions are too wide for plotting")
