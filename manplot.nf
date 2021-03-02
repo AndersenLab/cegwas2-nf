@@ -21,6 +21,7 @@ params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
 params.ci_size   = 150
 params.help    = null
+params.fix_names = "fix"
 params.max_QTL_number = 5
 params.max_QTL_size = 2000000
 params.R_libpath="/projects/b1059/software/R_lib_3.6.0"
@@ -207,6 +208,8 @@ process fix_strain_names_bulk {
 
   tag {"BULK TRAIT"}
 
+  publishDir "${params.out}", mode: 'copy'
+
   input:
     file(phenotypes) from traits_to_strainlist
 
@@ -216,9 +219,9 @@ process fix_strain_names_bulk {
 
   """
     # add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
-    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk_new.R > Fix_Isotype_names_bulk_new.R 
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
 
-    Rscript --vanilla Fix_Isotype_names_bulk_new.R ${phenotypes} ${params.vcf}
+    Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.vcf} ${params.fix_names}
   """
 
 }

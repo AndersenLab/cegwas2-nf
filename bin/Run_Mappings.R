@@ -265,7 +265,7 @@ process_mapping_df <- function (mapping_df,
           if (findPks$start[k] < min(tSNPs$index)) {
             findPks$start[k] <- min(tSNPs$index)
           }
-          else if (findPks$end[k] > max(tSNPs$index)) {
+          if (findPks$end[k] > max(tSNPs$index)) {
             findPks$end[k] <- max(tSNPs$index)
           }
         }

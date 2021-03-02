@@ -204,6 +204,9 @@ process fix_strain_names_bulk {
 
 	tag {"BULK TRAIT"}
 
+	publishDir "${params.out}", mode: 'copy'
+
+
 	input:
 		file(phenotypes) from traits_to_strainlist
 
@@ -474,7 +477,7 @@ qtl_peaks1
 
 peaks
    .join(processed_map_to_ld)
-   .join(pr_maps_trait2)
+   .join(pr_maps_trait)
    .spread(vcf_to_fine_map)
    .spread(strain_list_finemap)
    .into{QTL_peaks; QTL_peaks_print}
@@ -599,7 +602,6 @@ process rrblup_fine_maps {
 	input:
 		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
 
-
 	output:
 		set file("*pdf"), file("*prLD_df.tsv") into ld_out
 		set val(TRAIT), file(phenotype), file(roi_geno_matrix), file("*prLD_df.tsv") into concat_ld_out
@@ -674,7 +676,8 @@ process plot_genes {
 
 	cpus 1
     memory { 32.GB * task.attempt }
-    errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
+    //errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
+    errorStrategy 'ignore'
 
 	tag {phenotype}
 
