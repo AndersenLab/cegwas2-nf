@@ -2,6 +2,7 @@
 library(tidyverse)
 library(rrBLUP)
 library(ggbeeswarm)
+library(sommer)
 
 # argument information
 # 1 - Genetoype matrix
@@ -51,6 +52,43 @@ if(significance_threshold == "BF"){
   QTL_cutoff <- independent_test_cutoff
 } else {
   QTL_cutoff <- as.numeric(args[6])
+}
+
+# narrow heritability function
+narrowh2 <- function(df_h,geno_matrix){
+  
+  
+  
+  pheno_strains <- unique(df_h$strain)
+  
+  A <- sommer::A.mat(t(geno_matrix[,colnames(geno_matrix) %in% pheno_strains]))
+  
+  df_h2 <- data.frame(trait = NA, h2 = NA, h2_SE = NA)
+  
+  for(i in 1:(ncol(df_h)-1)) {
+    
+    trait <- colnames(df_h)[i+1]
+    
+    df_y <- df_h %>%
+      #dplyr::filter(strain != "ECA393") %>%  ### no geno infor
+      dplyr::arrange(strain) %>%
+      dplyr::select(strain, value=trait) %>%
+      dplyr::mutate(strain = as.character(strain))
+    
+    h2_res <- sommer::mmer(value~1, random=~sommer::vs(strain,Gu=A), data=df_y)
+    
+    h2 <- as.numeric(sommer::pin(h2_res, h2 ~ (V1) / (V1+V2))[[1]][1])
+    h2_SE <- sommer::pin(h2_res, h2 ~ (V1) / (V1+V2))[[2]]
+    
+    h2_combine = c(trait, h2, h2_SE)
+    
+    df_h2 <- rbind(df_h2, h2_combine) %>%
+      na.omit() %>%
+      dplyr::arrange(desc(h2))
+  }    
+  
+  return(df_h2)
+  
 }
 
 
@@ -242,7 +280,7 @@ process_mapping_df <- function (mapping_df,
           if (findPks$start[k] < min(tSNPs$index)) {
             findPks$start[k] <- min(tSNPs$index)
           }
-          else if (findPks$end[k] > max(tSNPs$index)) {
+          if (findPks$end[k] > max(tSNPs$index)) {
             findPks$end[k] <- max(tSNPs$index)
           }
         }
@@ -333,13 +371,19 @@ readr::write_tsv(raw_mapping,
                  path = glue::glue("{trait_name}_raw_mapping.tsv"),
                  col_names = T)
 
+#h2
+pheno_h2 <- narrowh2(df_h=phenotype_data,geno_matrix=genotype_matrix)
+
+nh2=round(as.numeric(pheno_h2$h2),digits = 2)
+
 # process mapping data, define QTL
 processed_mapping <- process_mapping_df(raw_mapping, 
                                         phenotype_data, 
                                         CI_size = as.numeric(args[8]), 
                                         snp_grouping = as.numeric(args[7]), 
                                         BF = QTL_cutoff,
-                                        geno = genotype_matrix)
+                                        geno = genotype_matrix) %>% 
+                        dplyr::mutate(h2=nh2)
 
 # save processed mapping data
 readr::write_tsv(processed_mapping, 

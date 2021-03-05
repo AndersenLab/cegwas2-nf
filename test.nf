@@ -1,5 +1,6 @@
 #! usr/bin/env nextflow
 
+nextflow.preview.dsl=2
 
 /*
 ~ ~ ~ > * USER INPUT PARAMETERS 
@@ -16,13 +17,15 @@ params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
 params.cendr_v   = "20180527"
-params.e_mem 	 = "100"
+params.e_mem 	 = "10"
 params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
 params.ci_size   = 150
 params.fix_names = "fix"
 params.help 	 = null
-params.R_libpath="/projects/b1059/software/R_lib_3.6.0"
+params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
+params.burden    = true
+params.finemap   = false
 
 println()
 
@@ -36,7 +39,6 @@ params.out = "Analysis_Results-${date}"
 ~ ~ ~ > * INITIATE GENE LOCATION FILE 
 */
 
-genes = Channel.fromPath("${params.genes}")
 
 log.info ""
 log.info "------------------------------------------"
@@ -71,6 +73,7 @@ if (params.help) {
     log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
     log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
+    log.info "--R_libpath                  String                Path to the required R libraries (DEFAULT = /projects/b1059/software/R_lib_3.4.1)"
     log.info ""
     log.info "--------------------------------------------------------"
     log.info "Information describing the stucture of the input files can be located in input_files/README.txt"
@@ -88,7 +91,6 @@ if (params.help) {
     log.info "R-tidyverse            v1.2.1"
     log.info "R-correlateR           Found on GitHub"
     log.info "R-rrBLUP               v4.6"
-    log.info "R-sommer               v3.5"
     log.info "R-RSpectra             v0.13-1"
     log.info "R-ggbeeswarm           v0.6.0"
     log.info "--------------------------------------------------------"    
@@ -100,7 +102,6 @@ log.info "Phenotype Directory                     = ${params.traitdir}"
 log.info "VCF                                     = ${params.vcf}"
 log.info "CeNDR Release                           = ${params.cendr_v}"
 log.info "P3D                                     = ${params.p3d}"
-log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "Max AF for Burden Mapping               = ${params.freqUpper}"
 log.info "Min Strains with Variant for Burden     = ${params.minburden}"
 log.info "Significance Threshold                  = ${params.sthresh}"
@@ -112,91 +113,96 @@ log.info ""
 }
 
 /*
-~ ~ ~ > * COMBINE VCF AND VCF INDEX INTO A CHANNEL
+~ ~ ~ > * WORKFLOW
 */
+workflow {
 
-if (params.vcf) {
-	
-	vcf = Channel.fromPath("${params.vcf}")
+	// VCF
+	if(params.vcf) {
+		vcf = Channel.fromPath("${params.vcf}")
+		vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
 
-	vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
-
-	vcf
-		.spread(vcf_index)
-		.into{vcf_to_whole_genome;
-			  vcf_to_fine_map;
-			  vcf_to_burden;
-			  vcf_to_query_vcf}
-
-} else {
-
-	process pull_vcf {
-
-		tag {"PULLING VCF FROM CeNDR"}
-		executor 'local'
-
-		output:
-			file("*.vcf.gz") into dl_vcf
-			file("*.vcf.gz.tbi") into dl_vcf_index
-
-		"""
-			wget https://storage.googleapis.com/elegansvariation.org/releases/${params.cendr_v}/variation/WI.${params.cendr_v}.impute.vcf.gz
-			tabix -p vcf WI.${params.cendr_v}.impute.vcf.gz
-		"""
+	} else {
+		vcf = pull_vcf.out.dl_vcf
+		vcf_index = pull_vcf.out.dl_vcf_index
 	}
 
-	dl_vcf
-		.spread(dl_vcf_index)
-		.into{vcf_to_whole_genome;
-			  vcf_to_fine_map;
-			  vcf_to_burden;
-			  vcf_to_query_vcf}
+	// Fix strain names
+	Channel.fromPath("${params.traitfile}") | fix_strain_names_bulk
+	traits_to_map = fix_strain_names_bulk.out.fixed_strain_phenotypes
+			.flatten()
+    		.map { file -> tuple(file.baseName.replaceAll(/pr_/,""), file) }
 
+    // Genotype matrix
+    pheno_strains = fix_strain_names_bulk.out.phenotyped_strains_to_analyze
+
+    vcf.spread(vcf_index)
+    		.combine(pheno_strains) | vcf_to_geno_matrix
+
+    // EIGEN
+	contigs = Channel.from(["I", "II", "III", "IV", "V", "X"])
+	contigs.combine(vcf_to_geno_matrix.out) | chrom_eigen_variants
+	chrom_eigen_variants.out.collect() | collect_eigen_variants
+
+	// GWAS mapping
+	collect_eigen_variants.out
+			.spread(vcf_to_geno_matrix.out)
+			.spread(traits_to_map)
+			.spread(Channel.from("${params.p3d}"))
+			.spread(Channel.from("${params.sthresh}"))
+			.spread(Channel.from("${params.group_qtl}"))
+			.spread(Channel.from("${params.ci_size}")) | rrblup_maps
+
+	// summarize
+	rrblup_maps.out.processed_map_to_summary_plot.collect() | summarize_maps
+
+	// only continue if manplot_only = false
+	if(params.finemap) {
+		// LD
+		rrblup_maps.out.pr_maps_trait
+				.combine(vcf_to_geno_matrix.out) | LD_between_regions
+
+		// Fine map
+		summarize_maps.out.qtl_peaks
+			   .splitCsv(sep: '\t')
+			   .join(rrblup_maps.out.processed_map_to_ld)
+			   .join(rrblup_maps.out.pr_maps_trait)
+			   .spread(vcf.spread(vcf_index))
+			   .spread(pheno_strains) | prep_ld_files | rrblup_fine_maps
+		rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
+
+		// Plot fine map
+		Channel.fromPath("${params.genes}")
+				.spread(concatenate_LD_per_trait.out)
+				.spread(vcf.spread(vcf_index)) | plot_genes
+
+		// Burden mapping
+		if(params.burden) {
+			traits_to_map
+				.spread(vcf.spread(vcf_index))
+				.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+		}
+	}
+
+
+	
 }
 
-/*
-~ ~ ~ > * INITIATE MAPPING QTL GROUPING PARAMETER
-*/
 
-Channel
-	.from("${params.ci_size}")
-	.set{qtl_ci_size}
+process pull_vcf {
 
-/*
-~ ~ ~ > * INITIATE MAPPING QTL CONFIDENCE INTERVAL SIZE PARAMETER
-*/
+	tag {"PULLING VCF FROM CeNDR"}
+	executor 'local'
 
-Channel
-	.from("${params.group_qtl}")
-	.set{qtl_snv_groupinng}
+	output:
+		path "*.vcf.gz", emit: dl_vcf 
+		path "*.vcf.gz.tbi", emit: dl_vcf_index 
 
-/*
-~ ~ ~ > * INITIATE MAPPING METHOD CHANNEL
-*/
-
-Channel
-	.from("${params.p3d}")
-	.into{p3d_full;
-		  p3d_fine}
-
-/*
-~ ~ ~ > * INITIATE THRESHOLD CHANNEL
-*/
-
-Channel
-	.from("${params.sthresh}")
-	.into{sig_threshold_full;
-		  sig_threshold_fine}
-
-/*
-~ ~ ~ > * INITIATE PHENOTYPE CHANNEL - GENERATES A [trait_name, trait_file] TUPLE
-*/
-
-
-
-Channel
-	.fromPath("${params.traitfile}")
-	.set{ traits_to_strainlist }
+	"""
+		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.cendr_v}/variation/WI.${params.cendr_v}.impute.vcf.gz
+		tabix -p vcf WI.${params.cendr_v}.impute.vcf.gz
+	"""
+}
 
 process fix_strain_names_bulk {
 
@@ -206,33 +212,23 @@ process fix_strain_names_bulk {
 
 	publishDir "${params.out}/Phenotypes", mode: 'copy'
 
-
 	input:
-		file(phenotypes) from traits_to_strainlist
+		file(phenotypes)
 
 	output:
-		file("pr_*.tsv") into fixed_strain_phenotypes
-		file("Phenotyped_Strains.txt") into phenotyped_strains_to_analyze
+		path "pr_*.tsv", emit: fixed_strain_phenotypes 
+		path "Phenotyped_Strains.txt", emit: phenotyped_strains_to_analyze 
 
 	"""
 		# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
-		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk_new.R > Fix_Isotype_names_bulk_new.R 
+		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
 
-		Rscript --vanilla Fix_Isotype_names_bulk_new.R ${phenotypes} ${params.fix_names}
+		Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.vcf} ${params.fix_names}
 	"""
 
 }
 
-fixed_strain_phenotypes
-    .flatten()
-    .map { file -> tuple(file.baseName.replaceAll(/pr_/,""), file) }
-	.into{ traits_to_map;
-		  traits_to_burden }
 
-
-phenotyped_strains_to_analyze
-	.into{strain_list_genome;
-		  strain_list_finemap}
 
 process vcf_to_geno_matrix {
 
@@ -243,11 +239,10 @@ process vcf_to_geno_matrix {
 	cpus 1
 
 	input:
-		set file(vcf), file(index) from vcf_to_whole_genome
-		file(strains) from strain_list_genome
+		tuple file(vcf), file(index), file(strains)
 
 	output:
-		file("Genotype_Matrix.tsv") into geno_matrix
+		file("Genotype_Matrix.tsv") 
 
 	"""
 
@@ -293,10 +288,6 @@ process vcf_to_geno_matrix {
 
 }
 
-geno_matrix
-	.into{eigen_gm;
-		  mapping_gm}
-
 
 /*
 ============================================================
@@ -308,8 +299,6 @@ geno_matrix
 ============================================================
 */
 
-CONTIG_LIST = ["I", "II", "III", "IV", "V", "X"]
-contigs = Channel.from(CONTIG_LIST)
 
 /*
 ------------ Decomposition per chromosome
@@ -323,20 +312,19 @@ process chrom_eigen_variants {
 	memory params.eigen_mem
 
 	input:
-		file(genotypes) from eigen_gm
-		each CHROM from contigs
+		tuple val(CHROM), file(genotypes)
+
 
 	output:
-		file("${CHROM}_independent_snvs.csv") into sig_snps_geno_matrix
-		file(genotypes) into concat_geno
+		file("${CHROM}_independent_snvs.csv")
 
 
 	"""
 		cat Genotype_Matrix.tsv |\\
 		awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
-		
+
 		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R > Get_GenoMatrix_Eigen.R
-		Rscript --vanilla Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}	
+		Rscript --vanilla Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
 	"""
 
 }
@@ -354,10 +342,10 @@ process collect_eigen_variants {
 	cpus 1
 
 	input:
-		file(chrom_tests) from sig_snps_geno_matrix.collect()
+		file(chrom_tests) //from sig_snps_geno_matrix.collect()
 
 	output:
-		file("total_independent_tests.txt") into independent_tests
+		file("total_independent_tests.txt") //into independent_tests
 
 	"""
 		cat *independent_snvs.csv |\\
@@ -367,14 +355,6 @@ process collect_eigen_variants {
 
 }
 
-independent_tests
-	.spread(mapping_gm)
-	.spread(traits_to_map)
-	.spread(p3d_full)
-	.spread(sig_threshold_full)
-	.spread(qtl_snv_groupinng)
-	.spread(qtl_ci_size)
-	.set{mapping_data}
 
 /*
 ======================================
@@ -402,14 +382,13 @@ process rrblup_maps {
 	
 
 	input:
-	set file("independent_snvs.csv"), file(geno), val(TRAIT), file(pheno), val(P3D), val(sig_thresh), val(qtl_grouping_size), val(qtl_ci_size) from mapping_data
+	tuple file("independent_snvs.csv"), path(geno), val(TRAIT), path(pheno), val(P3D), val(sig_thresh), val(qtl_grouping_size), val(qtl_ci_size) 
 
 	output:
-	file("*raw_mapping.tsv") into raw_map
-	set val(TRAIT), file(geno), file(pheno) into processed_map_to_ld
-	file("*processed_mapping.tsv") into processed_map_to_summary_plot
-	set val(TRAIT), file("*processed_mapping.tsv") into pr_maps_trait
-	file("*.pdf") into gwas_plots
+	tuple TRAIT, path(geno), path(pheno), emit: "processed_map_to_ld"
+	path "*processed_mapping.tsv", emit: processed_map_to_summary_plot
+	tuple TRAIT, path("*processed_mapping.tsv"), emit: "pr_maps_trait"
+	file("*.pdf")
 
 	"""
 	tests=`cat independent_snvs.csv | grep -v inde`
@@ -440,12 +419,12 @@ process summarize_maps {
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
 
 	input:
-	file(maps) from processed_map_to_summary_plot.collect()
+	file(maps)
 
 	output:
-	file("*.pdf") into summarized_plot
-	file("QTL_peaks.tsv") into qtl_peaks
-  	val true into qtl_peaks_done
+	file("*.pdf")
+	path "QTL_peaks.tsv", emit: qtl_peaks
+  	//val true into qtl_peaks_done
 
 
 	"""
@@ -468,20 +447,31 @@ process summarize_maps {
 	"""
 }
 
-qtl_peaks
-  .into{qtl_peaks1 ; qtl_peaks2}
+/*
+------------ Generate linkage plot between QTL regions
+*/
 
+process LD_between_regions {
 
-qtl_peaks1
-   .splitCsv(sep: '\t')
-   .into{peaks ; printpeaks ; html_report_peaks }
+  tag { TRAIT }
 
-peaks
-   .join(processed_map_to_ld)
-   .join(pr_maps_trait)
-   .spread(vcf_to_fine_map)
-   .spread(strain_list_finemap)
-   .into{QTL_peaks; QTL_peaks_print}
+  publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*LD_between_QTL_regions.tsv"
+
+  input:
+  tuple val(TRAIT), path("processed_mapping.tsv"), path("Genotype_Matrix.tsv")
+
+  output:
+  tuple val(TRAIT), path("*LD_between_QTL_regions.tsv") optional true
+  //val(TRAIT) into linkage_done
+
+  """
+
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
+
+    Rscript --vanilla LD_between_regions.R Genotype_Matrix.tsv processed_mapping.tsv ${TRAIT}
+
+  """
+}
 
 /*
 ======================================
@@ -502,10 +492,10 @@ process prep_ld_files {
 	tag {TRAIT}
 
 	input:
-		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(strains) from QTL_peaks
+		tuple val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(log10p), val(var_exp), val(h2), path(complete_geno), path(phenotype), path(pr_map), path(vcf), path(index), path(strains)
 
 	output:
-		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file("*ROI_Genotype_Matrix.tsv"), file("*LD.tsv") into LD_files_to_plot
+		tuple val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(log10p), val(var_exp), val(h2), path(complete_geno), path(phenotype), path(pr_map), path(vcf), path(index), path("*ROI_Genotype_Matrix.tsv"), path("*LD.tsv") 
 
 	"""
 		echo "HELLO"
@@ -584,10 +574,6 @@ process prep_ld_files {
 	"""
 }
 
-//p3d_fine
-//	.spread(LD_files_to_plot)
-//	.set{LD_files_to_finemap}
-
 /*
 ------------ Run fine mapping
 */
@@ -601,11 +587,13 @@ process rrblup_fine_maps {
 	tag {"${TRAIT} ${CHROM}:${start_pos}-${end_pos}"}
 
 	input:
-		set val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), file(complete_geno), file(phenotype), file(pr_map), file(vcf), file(index), file(roi_geno_matrix), file(roi_ld) from LD_files_to_plot
+		tuple val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(log10p), val(var_exp), val(h2), path(complete_geno), path(phenotype), path(pr_map), path(vcf), path(index), path(roi_geno_matrix), path(roi_ld) 
+
 
 	output:
-		set file("*pdf"), file("*prLD_df.tsv") into ld_out
-		set val(TRAIT), file(phenotype), file(roi_geno_matrix), file("*prLD_df.tsv") into concat_ld_out
+		//tuple path("*pdf"), path("*prLD_df.tsv")
+		tuple val(TRAIT), path(phenotype), path(roi_geno_matrix), path("*prLD_df.tsv"), emit: prLD
+		tuple path("*pdf"), path("*prLD_df.tsv")
 
 	"""
         for i in *ROI_Genotype_Matrix.tsv;
@@ -635,10 +623,11 @@ process concatenate_LD_per_trait {
 	executor 'local'
 
 	input:
-		set val(TRAIT), file(phenotype), file(roi_geno_matrix), file(processed_ld) from concat_ld_out
+		tuple val(TRAIT), path(phenotype), path(roi_geno_matrix), path(processed_ld)
+
 
 	output:
-		set file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype) into combined_ld_data
+		set val(TRAIT), file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype)
 
 	"""
 		for i in *prLD_df.tsv;
@@ -664,11 +653,6 @@ process concatenate_LD_per_trait {
 
 }
 
-genes
-	.spread(combined_ld_data)
-	.spread(vcf_to_query_vcf)
-	.set{plot_fine_map_genes}
-
 /*
 ------------ Plot Fine mapping results overlaid on gene locations
 */
@@ -686,11 +670,11 @@ process plot_genes {
 	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*snpeff_genes.tsv"
 
 	input:
-		set file(genes), val(TRAIT), file(ld), file(phenotype), file(vcf), file(vcfindex) from plot_fine_map_genes
+		tuple path(genes), val(TRAIT), path(ld), path(phenotype), path(vcf), path(vcfindex)
 
 	output:
-		set val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf") into gene_plts
-    val(TRAIT) into gene_plts_done
+		tuple val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf")
+    	//val(TRAIT) into gene_plts_done
 
 	"""
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_genes.R > plot_genes.R
@@ -709,14 +693,6 @@ process plot_genes {
 ====================================
 */
 
-Channel
-	.fromPath("${params.refflat}")
-	.set{refflat_file}
-
-traits_to_burden
-	.spread(vcf_to_burden)
-	.spread(refflat_file)
-	.set{burden_input}
 
 process burden_mapping {
 
@@ -726,10 +702,10 @@ process burden_mapping {
 	publishDir "${params.out}/BURDEN/VT/Data", mode: 'copy', pattern: "*.VariableThresholdPrice.assoc"
 
 	input:
-		set val(TRAIT), file(trait_df), file(vcf), file(index), file(refflat) from burden_input
+		tuple val(TRAIT), file(trait_df), file(vcf), file(index), file(refflat)
 
 	output:
-		set val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc") into burden_results
+		tuple val(TRAIT), file("*.Skat.assoc"), file("*.VariableThresholdPrice.assoc")
 
 	"""
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/makeped.R > makeped.R
@@ -761,10 +737,10 @@ process plot_burden {
 	publishDir "${params.out}/BURDEN/VT/Plots", mode: 'copy', pattern: "*VTprice.pdf"
 
 	input:
-		set val(TRAIT), file(skat), file(vt) from burden_results
+		tuple val(TRAIT), file(skat), file(vt)
 
 	output:
-		set val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots
+		tuple val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf")
 
 	"""
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_burden.R > plot_burden.R
@@ -815,4 +791,3 @@ workflow.onComplete {
 
 
 }
-

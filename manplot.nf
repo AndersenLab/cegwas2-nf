@@ -208,7 +208,7 @@ process fix_strain_names_bulk {
 
   tag {"BULK TRAIT"}
 
-  publishDir "${params.out}", mode: 'copy'
+  publishDir "${params.out}/Phenotypes", mode: 'copy'
 
   input:
     file(phenotypes) from traits_to_strainlist
@@ -442,11 +442,13 @@ process summarize_maps {
 
 
   """
-    cat *processed_mapping.tsv |\\
+    cat  *processed_mapping.tsv |\\
     awk '\$0 !~ "\\tNA\\t" {print}' |\\
-    awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
-    awk 'NR>1{print \$5, \$2, \$12, \$13, \$14}' OFS="\\t" > QTL_peaks.tsv
+    awk '!seen[\$2,\$4,\$5,\$11,\$12,\$13,\$14,\$17]++' |\\
+    awk 'NR>1{print \$5, \$2, \$12, \$13, \$14,\$4,\$11,\$17}' OFS="\\t" > QTL_peaks.tsv
+
     sig_maps=`wc -l QTL_peaks.tsv | cut -f1 -d' '`
+    
     if [ \$sig_maps = 0 ]; then   # this is for all traits combined
       max_log10=`cat *processed_mapping.tsv | awk 'BEGIN {max = 0} {if (\$4>max && \$4!= "log10p") max=\$4} END {print max}'`
       echo "NO TRAITS HAD SIGNIFICANT MAPPINGS - MAXIMUM -log10p IS \$max_log10 - CONSIDER SETTING BF THRESHOLD BELOW THIS VALUE"
