@@ -7,7 +7,6 @@ nextflow.preview.dsl=2
 */
 date = new Date().format( 'yyyyMMdd' )
 
-params.traitdir  = null
 params.traitfile = null
 params.vcf 		 = null
 params.p3d 		 = null
@@ -16,7 +15,7 @@ params.freqUpper = 0.05
 params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
-params.cendr_v   = "20180527"
+params.cendr_v   = "20210121"
 params.e_mem 	 = "10"
 params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
@@ -25,7 +24,8 @@ params.fix_names = "fix"
 params.help 	 = null
 params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
 params.burden    = true
-params.finemap   = false
+params.finemap   = true
+params.report    = true
 
 println()
 
@@ -53,7 +53,6 @@ if (params.help) {
     log.info "----------------------------------------------------------------"
     log.info ""
     log.info "nextflow main.nf --traitfile=test_bulk --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
-    log.info "nextflow main.nf --traitdir=test_bulk --p3d=TRUE --sthresh=BF # download VCF from CeNDR"
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
@@ -64,7 +63,10 @@ if (params.help) {
    	log.info "Optional arguments (General):"
    	log.info "--out                    String                Name of folder that will contain the results"
     log.info "--e_mem                  String                Value that corresponds to the amount of memory to allocate for eigen decomposition of chromosomes (DEFAULT = 100)"
-    log.info "--cendr_v                String                CeNDR release (DEFAULT = 20180527)"
+    log.info "--cendr_v                String                CeNDR release (DEFAULT = 20210121)"
+    log.info "--burden                 BOOLEAN               Whether or not to perform burden mapping (DEFAULT = TRUE). NOTE: HTML report will not be generated if burden is set to FALSE."
+    log.info "--finemap                BOOLEAN               Whether or not to perform fine-mapping (DEFAULT = TRUE)"
+    log.info "--report                 BOOLEAN               Whether or not to generate HTML report for each trait (DEFAULT = TRUE). Change to FALSE if you are mapping many traits. Requires burden = TRUE to run."
     log.info "Optional arguments (Marker):"
     log.info "--sthresh                String                Significance threshold for QTL - Options: BF - for bonferroni correction, EIGEN - for SNV eigen value correction, or another number e.g. 4"
     log.info "--group_qtl              Integer               If two QTL are less than this distance from each other, combine the QTL into one, (DEFAULT = 1000)"
@@ -73,7 +75,7 @@ if (params.help) {
     log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
     log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
-    log.info "--R_libpath                  String                Path to the required R libraries (DEFAULT = /projects/b1059/software/R_lib_3.4.1)"
+    log.info "--R_libpath              String                Path to the required R libraries (DEFAULT = /projects/b1059/software/R_lib_3.4.1)"
     log.info ""
     log.info "--------------------------------------------------------"
     log.info "Information describing the stucture of the input files can be located in input_files/README.txt"
@@ -98,17 +100,30 @@ if (params.help) {
 } else {
 
 log.info ""
-log.info "Phenotype Directory                     = ${params.traitdir}"
+log.info "Phenotype File                          = ${params.traitfile}"
 log.info "VCF                                     = ${params.vcf}"
 log.info "CeNDR Release                           = ${params.cendr_v}"
+log.info "Gene File                               = ${params.genes}"
+log.info "Annotation File                         = ${params.refflat}"
+log.info ""
+log.info "------------------------------------------------------------"
+log.info ""
+log.info "Significance Threshold                  = ${params.sthresh}"
 log.info "P3D                                     = ${params.p3d}"
 log.info "Max AF for Burden Mapping               = ${params.freqUpper}"
 log.info "Min Strains with Variant for Burden     = ${params.minburden}"
-log.info "Significance Threshold                  = ${params.sthresh}"
-log.info "Gene File                               = ${params.genes}"
-log.info "Result Directory                        = ${params.out}"
+log.info "Threshold for grouping QTL              = ${params.group_qtl}"
+log.info "Number of SNVs to define CI             = ${params.ci_size}"
+log.info "Fix isotype names and prune data        = ${params.fix_names}"
 log.info "Eigen Memory allocation                 = ${params.eigen_mem}"
 log.info "Path to R libraries.                    = ${params.R_libpath}"
+log.info ""
+log.info "------------------------------------------------------------"
+log.info ""
+log.info "Burden mapping                          = ${params.burden}"
+log.info "Fine mapping                            = ${params.finemap}"
+log.info "HTML report generation                  = ${params.report}"
+log.info "Result Directory                        = ${params.out}"
 log.info ""
 }
 
@@ -123,8 +138,10 @@ workflow {
 		vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
 
 	} else {
-		vcf = pull_vcf.out.dl_vcf
-		vcf_index = pull_vcf.out.dl_vcf_index
+		//vcf = pull_vcf.out.dl_vcf
+		//vcf_index = pull_vcf.out.dl_vcf_index
+		vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
+		vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
 	}
 
 	// Fix strain names
@@ -181,14 +198,36 @@ workflow {
 			traits_to_map
 				.spread(vcf.spread(vcf_index))
 				.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+
+
+			// generate html report -- change this to accomate no burden too?
+			if(params.report) {
+
+				plot_burden.out
+					.join(LD_between_regions.out.linkage_done)
+					.combine(summarize_maps.out.qtl_peaks_done) | html_report_main
+				summarize_maps.out.qtl_peaks | html_region_prep_table
+
+			    summarize_maps.out.qtl_peaks
+			    	.splitCsv(sep: '\t')
+			    	.combine(plot_genes.out.gene_plts_done, by: 0)
+			    	.combine(html_region_prep_table.out.html_region_prep_table_done) | html_report_region
+
+			}
+		} else {
+			if(params.report) {
+				println """
+
+		        WARNING: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
+
+		        """
+		        //exit 1
+			}
 		}
 	}
-
-
-	
 }
 
-
+// is this necessary or can i just feed in the location to the vcf on quest?
 process pull_vcf {
 
 	tag {"PULLING VCF FROM CeNDR"}
@@ -199,8 +238,8 @@ process pull_vcf {
 		path "*.vcf.gz.tbi", emit: dl_vcf_index 
 
 	"""
-		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.cendr_v}/variation/WI.${params.cendr_v}.impute.vcf.gz
-		tabix -p vcf WI.${params.cendr_v}.impute.vcf.gz
+		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.cendr_v}/variation/WI.${params.cendr_v}.hard-filter.isotype.vcf.gz
+		tabix -p vcf WI.${params.cendr_v}.hard-filter.isotype.vcf.gz
 	"""
 }
 
@@ -424,7 +463,7 @@ process summarize_maps {
 	output:
 	file("*.pdf")
 	path "QTL_peaks.tsv", emit: qtl_peaks
-  	//val true into qtl_peaks_done
+  	val true, emit: qtl_peaks_done
 
 
 	"""
@@ -462,7 +501,7 @@ process LD_between_regions {
 
   output:
   tuple val(TRAIT), path("*LD_between_QTL_regions.tsv") optional true
-  //val(TRAIT) into linkage_done
+  val TRAIT, emit: linkage_done
 
   """
 
@@ -627,7 +666,7 @@ process concatenate_LD_per_trait {
 
 
 	output:
-		set val(TRAIT), file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype)
+		tuple val(TRAIT), file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype)
 
 	"""
 		for i in *prLD_df.tsv;
@@ -673,8 +712,8 @@ process plot_genes {
 		tuple path(genes), val(TRAIT), path(ld), path(phenotype), path(vcf), path(vcfindex)
 
 	output:
-		tuple val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf")
-    	//val(TRAIT) into gene_plts_done
+		tuple val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf"), emit: gene_plts
+    	val TRAIT, emit: gene_plts_done
 
 	"""
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_genes.R > plot_genes.R
@@ -747,6 +786,129 @@ process plot_burden {
 
     Rscript --vanilla plot_burden.R ${TRAIT} ${skat} ${vt}
 	"""
+}
+
+/*
+====================================
+~ > *                          * < ~
+~ ~ > *                      * < ~ ~
+~ ~ ~ > * CREATE HTML REPORT  * < ~ ~ ~
+~ ~ > *                      * < ~ ~
+~ > *                          * < ~
+====================================
+*/
+
+/*
+------ Create main report regardless of whether any significant QTL regions exist
+*/
+
+/*    Recall that:
+set val(TRAIT), file("*SKAT.pdf"), file("*VTprice.pdf") into burden_plots 
+val(TRAIT) into linkage_done
+*/
+
+
+
+process html_report_main {
+
+  executor 'local'
+  errorStrategy 'ignore'
+
+  tag {TRAIT}
+  memory '16 GB'
+  
+
+  publishDir "${params.out}", mode: 'copy'
+
+
+  input:
+    tuple val(TRAIT), file(a), file(b), val(peaks_done)
+
+  output:
+    tuple file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html")
+
+
+  """
+    cat "${workflow.projectDir}/bin/cegwas2_report_main.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}_main.Rmd 
+
+    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+
+    Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_main.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
+
+  """
+}
+
+
+
+/*
+------ Slice out the QTL region for plotting divergent region and haplotype data.
+*/
+
+
+process html_region_prep_table {
+
+  executor 'local'
+
+  publishDir "${params.out}/Divergent_and_haplotype", mode: 'copy'
+
+
+  input:
+    file("QTL_peaks.tsv")
+  output:
+    tuple file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_isotype_list.txt"), emit: div_hap_table
+    val true, emit: html_region_prep_table_done
+
+
+  """
+  cat QTL_peaks.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
+
+  bedtools intersect -wa -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_bins.bed
+
+  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_div.bed
+
+  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo | sort -k1,1 -k2,2n | uniq > haplotype_in_QTL_region.txt
+
+  cp ${workflow.projectDir}/bin/div_isotype_list.txt . 
+
+  """
+
+}
+
+
+/*
+------ Create report for each significant QTL region.
+*/
+
+
+process html_report_region {
+
+	tag "$TRAIT $CHROM $peak_pos"
+    memory '20 GB'
+
+    errorStrategy 'ignore'
+
+	publishDir "${params.out}", mode: 'copy', pattern: "*.Rmd"
+	publishDir "${params.out}", mode: 'copy', pattern: "*.html"
+
+	input:
+		tuple val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(log10p), val(var_exp), val(h2), val(div_done)
+
+	output:
+		tuple file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html") optional true
+
+
+	"""
+    if (( ${end_pos}-1500000 < ${start_pos} )); then
+
+		  cat "${workflow.projectDir}/bin/cegwas2_report_region.Rmd" | sed -e "s/TRAIT_NAME_HOLDER/${TRAIT}/g" -e "s/QTL_CHROM_HOLDER/${CHROM}/g" -e "s/QTL_REGION_START_HOLDER/${start_pos}/g" -e "s/QTL_PEAK_HOLDER/${peak_pos}/g" -e "s/QTL_REGION_END_HOLDER/${end_pos}/g" > cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd 
+
+      echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+
+		  Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
+
+    fi
+	"""
+
 }
 
 
