@@ -1,48 +1,64 @@
-#!/usr/bin/env Rscript
 library(tidyverse)
-#library(cegwas2)
-library(data.table)
+library(cegwas)
 
-args <- commandArgs(trailingOnly = TRUE)
+# extract strain, isotype dataframe from database
+generate_isotype_lookup <- function(species = "ce") {
 
-# arguments
-# 1 - raw phenotype
-# 2 - option to fix pheno? default true
-# 3 - strain isotype lookup table
+    if ( species == "ce" ) {
+        isotype_lookup <- dplyr::collect(cegwas2::get_db("strain")) %>%
+            dplyr::mutate(strain_names = ifelse(!is.na( previous_names ),
+                                                paste( strain, previous_names, sep = "|" ),
+                                                strain )) %>%
+            tidyr::separate_rows(strain_names, sep = "\\|") %>%
+            dplyr::select(strain, previous_name = strain_names, isotype) %>%
+            dplyr::distinct()
+    }
+
+    return( isotype_lookup )
+}
+
+
 
 #' Resolve strain names to isotypes
+#'
+#' \code{resolve_isotypes} takes a vector of strain names and converts them to CeNDR-defined isotype names
+#'
+#' @param strains a vector of strain names to change to isotype names.
+#' @return Output is a vector with isotype names
+#' @importFrom dplyr %>%
+#' @export
 resolve_isotypes <- function(...) {
-    
-    isotype_lookup = data.table::fread(args[3])
+
+    isotype_lookup = generate_isotype_lookup()
     strains <- unlist(list(...))
-    
+
     purrr::map_chr(strains, function(x) {
         isotype <- isotype_lookup %>%
             dplyr::filter(
                 (x == strain) |
-                    (x == isotype) |
-                    (x == previous_names)
+                (x == isotype) |
+                (x == previous_name)
             ) %>%
             dplyr::pull(isotype) %>%
             unique()
-        
+
         if (length(isotype) == 0) {
-            message(glue::glue("{x} is not a known strain. Isotype set to NA; Please check CeNDR"))
+          message(glue::glue("{x} is not a known strain. Isotype set to NA; Please check CeNDR"))
         } else if (length(isotype) > 1) {
-            message(glue::glue("{x} resolves to multiple isotypes. Isotype set to NA; Please check CeNDR"))
+          message(glue::glue("{x} resolves to multiple isotypes. Isotype set to NA; Please check CeNDR"))
         }
         if (length(isotype) != 1) {
             isotype <- NA
         }
         isotype
     })
-    
+
 }
 
 
 # data = strain, trait, phenotype
 BAMF_prune <- function(data, remove_outliers = TRUE ){
-    
+
     categorize1 <- function(data) {
         with(data,
              ( (sixhs >= 1 & ( (s6h + s5h + s4h ) / numst) <= .05))
@@ -71,7 +87,7 @@ BAMF_prune <- function(data, remove_outliers = TRUE ){
     }
     napheno <- data[is.na(data$phenotype), ] %>%
         dplyr::mutate(bamfoutlier1 = NA, bamfoutlier2 = NA, bamfoutlier3 = NA)
-    
+
     datawithoutliers <- data %>%
         # Filter out all of the wash and/or empty wells
         dplyr::filter(!is.na(strain)) %>%
@@ -180,7 +196,7 @@ BAMF_prune <- function(data, remove_outliers = TRUE ){
         dplyr::mutate(cuts = categorize1(.),
                       cuts1 = categorize2(.),
                       cuts2 = categorize3(.))
-    
+
     if ( remove_outliers == T){
         outliers_removed <- datawithoutliers %>%
             dplyr::rename(bamfoutlier1 = cuts,
@@ -188,7 +204,7 @@ BAMF_prune <- function(data, remove_outliers = TRUE ){
                           bamfoutlier3 = cuts2) %>%
             dplyr::filter(!bamfoutlier1 & !bamfoutlier2 & !bamfoutlier3) %>%
             dplyr::select(trait, strain, phenotype)
-        
+
         return(outliers_removed)
     } else {
         with_outliers <- datawithoutliers %>%
@@ -198,41 +214,53 @@ BAMF_prune <- function(data, remove_outliers = TRUE ){
             dplyr::select(trait, strain, phenotype, bamfoutlier1, bamfoutlier2, bamfoutlier3) %>%
             dplyr::mutate(outlier = ifelse( bamfoutlier1 | bamfoutlier2 | bamfoutlier3, TRUE, FALSE)) %>%
             dplyr::select(strain, trait, phenotype, outlier)
-        
+
         return(with_outliers)
     }
 }
 
 #' Process phenotypes for mapping
+#'
+#' \code{process_phenotypes} takes input raw phenotype data and converts strain names to
+#' isotype names, summarizes replicate data, and eliminates outliers.
+#'
+#' @param df a dataframe with a strain column and columns for each trait for processing.
+#' @param summarize_replicates summarization method, currently limited to "mean" or "median" (or "none" for no summarizing - use for H2 calculation)
+#' @param prune_method method for eliminating outliers, currently limited to "BAMF", "Z", "TUKEY", "MAD"
+#' @param remove_outliers boolean to specify if outliers should be eliminated within the function.
+#' If FALSE, additional columns will be output specifying if the strain phenotype is an outier.
+#' @param threshold integer value defining the threshold for outlier removal, default = 2
+#' @return Output is a dataframe with
+#' @export
 process_phenotypes <- function(df,
                                summarize_replicates = "mean",
                                prune_method = "BAMF",
                                remove_outliers = TRUE,
                                threshold = 2){
-    
+
     if ( sum(grepl(colnames(df)[1], "Strain", ignore.case = T)) == 0 ) {
         message(glue::glue("Check input data format, strain should be the first column."))
     }
-    
+
     # ~ ~ ~ # resolve strain isotypes # ~ ~ ~ #
     # get strain isotypes
-    strain_isotypes_db <- data.table::fread(args[3])
+    strain_isotypes_db <- generate_isotype_lookup()
     # identify strains that were phenotyped, but are not part of an isotype
     non_isotype_strains <- dplyr::filter(df,
                                          !(strain %in% strain_isotypes_db$strain),
                                          !(strain %in% strain_isotypes_db$isotype))
     # remove any strains identified to not fall into an isotype
     if ( nrow(non_isotype_strains) > 0 ) {
-        
+
         strains_to_remove <- unique(non_isotype_strains$strain)
-        
+
         message(glue::glue("Removing strain(s) {strains_to_remove} because they do not fall into a defined isotype."))
-        
+
         df_non_isotypes_removed <- dplyr::filter( df, !( strain %in% strains_to_remove) )
     } else {
         df_non_isotypes_removed <- df
     }
-    
+
     # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ # Resolve Isotypes # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ #
     df_isotypes_resolved <- df_non_isotypes_removed %>%
         dplyr::group_by(strain) %>%
@@ -277,28 +305,28 @@ process_phenotypes <- function(df,
             } 
             else {
                 message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed.
-                                                   To include this isotype in the analysis, you can (1) phenotype {i} or (2) evaluate the similarity of these strains and choose one representative for the group."))
+                               To include this isotype in the analysis, you can (1) phenotype {i} or (2) evaluate the similarity of these strains and choose one representative for the group."))
             }
-            }
+        }
         # add to data
         fixed_issues <- rbind(fixed_issues, fix)
-        }
-    
+    }
+
     # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ # Summarize Replicate Data # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ #
     df_replicates_summarized <- fixed_issues %>%
         dplyr::group_by(isotype, trait) %>% {
             if(summarize_replicates == "mean") dplyr::summarise(., phenotype = mean(as.numeric(phenotype), na.rm = T ) )
             else if(summarize_replicates == "median") dplyr::summarise(., phenotype = median(as.numeric(phenotype), na.rm = T ) )
-            #else if(summarize_replicates == "none") dplyr::mutate(., phenotype = as.numeric(phenotype))
-            else  message(glue::glue("Please choose mean or median as options for summarizing replicate data.")) } %>%
+            else if(summarize_replicates == "none") dplyr::mutate(., phenotype = as.numeric(phenotype))
+            else  message(glue::glue("Please choose mean or median as options for summarizeing replicate data.")) } %>%
         dplyr::rename(strain = isotype) %>%
         dplyr::ungroup()
-    
+
     # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ # Outlier Functions # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ #
     is_out_tukey <- function(x, k = threshold, na.rm = TRUE) {
         quar <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm)
         iqr <- diff(quar)
-        
+
         ( !(quar[1] - k * iqr <= x) ) | ( !(x <= quar[2] + k * iqr) )
     }
     is_out_z <- function(x, thres = threshold, na.rm = TRUE) {
@@ -307,7 +335,7 @@ process_phenotypes <- function(df,
     is_out_mad <- function(x, thres = threshold, na.rm = TRUE) {
         ( !abs(x - median(x, na.rm = na.rm)) <= thres * mad(x, na.rm = na.rm) )
     }
-    
+
     # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ # Perform outlier removal # ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ ## ~ ~ ~ #
     if ( prune_method == "BAMF" ) {
         df_outliers <- BAMF_prune(df_replicates_summarized, remove_outliers = FALSE)
@@ -317,12 +345,12 @@ process_phenotypes <- function(df,
                 if (prune_method == "MAD") dplyr::transmute_if(., is.numeric, dplyr::funs( outlier = is_out_mad ) )
                 else if (prune_method == "TUKEY") dplyr::transmute_if(., is.numeric, dplyr::funs( outlier = is_out_tukey ) )
                 else if (prune_method == "Z") dplyr::transmute_if(., is.numeric, dplyr::funs( outlier = is_out_z ) )
-                else message(glue::glue("Please choose BAMF, MAD, TUKEY, or Z as options for summarizeing replicate data.")) } %>%
+                else  message(glue::glue("Please choose BAMF, MAD, TUKEY, or Z as options for summarizeing replicate data.")) } %>%
             dplyr::ungroup() %>%
             dplyr::bind_cols(., dplyr::ungroup(df_replicates_summarized)) %>%
             dplyr::select(strain, trait, phenotype, outlier)
     }
-    
+
     if (remove_outliers == TRUE ) {
         processed_phenotypes_output <- df_outliers %>%
             dplyr::filter( !outlier ) %>%
@@ -332,38 +360,7 @@ process_phenotypes <- function(df,
         processed_phenotypes_output <- df_outliers %>%
             tidyr::spread( trait, phenotype)
     }
-    
+
     return(processed_phenotypes_output)
 }
 
-
-######## process pheno
-
-# load trait file
-traits <- readr::read_tsv(args[1])
-
-# print messages to file
-sink("strain_issues.txt")
-sink(stdout(), type = "message")
-print("Strain issues: (if empty, no strain issues were found)")
-
-# fix strain names
-if(args[2] == "fix"){
-    fixed_names <- process_phenotypes(traits)
-} else {
-    fixed_names <- traits
-}
-
-for(i in 1:(ncol(fixed_names)-1)){
-    t_df <- fixed_names[,c(1,i+1)]
-    trait_name <- colnames(t_df)[2]
-    write.table(t_df, 
-                file = glue::glue("pr_{trait_name}.tsv"),
-                quote = F, col.names = T, row.names = F, sep="\t")
-}
-
-write.table(fixed_names$strain, 
-            file = glue::glue("Phenotyped_Strains.txt"),
-            quote = F, col.names = F, row.names = F)
-
-sink()

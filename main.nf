@@ -8,9 +8,9 @@ nextflow.preview.dsl=2
 date = new Date().format( 'yyyyMMdd' )
 
 params.traitfile = null
-params.vcf 		 = null
-params.p3d 		 = null
-params.sthresh   = null
+params.vcf 		 = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz"
+params.p3d 		 = false
+params.sthresh   = "EIGEN"
 params.freqUpper = 0.05
 params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
@@ -26,19 +26,9 @@ params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
 params.burden    = true
 params.finemap   = true
 params.report    = true
+params.out       = "Analysis_Results-${date}"
 
 println()
-
-/*
-~ ~ ~ > * OUTPUT DIRECTORY 
-*/
-
-params.out = "Analysis_Results-${date}"
-
-/*
-~ ~ ~ > * INITIATE GENE LOCATION FILE 
-*/
-
 
 log.info ""
 log.info "------------------------------------------"
@@ -52,7 +42,10 @@ if (params.help) {
     log.info "                      USAGE                                     "
     log.info "----------------------------------------------------------------"
     log.info ""
-    log.info "nextflow main.nf --traitfile=test_bulk --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
+    log.info "REQUIRES NEXTFLOW VERSION 20.0+"
+    log.info ">> module load python/anaconda3.6"
+    log.info ">> source activate /projects/b1059/software/conda_envs/nf20_env"
+    log.info "nextflow main.nf --traitfile=test_bulk --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
@@ -214,15 +207,27 @@ workflow {
 			    	.combine(html_region_prep_table.out.html_region_prep_table_done) | html_report_region
 
 			}
-		} else {
-			if(params.report) {
-				println """
+		} else if(params.report) {
+			println """
 
-		        WARNING: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
+	        ERROR: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
 
-		        """
-		        //exit 1
-			}
+	        """
+	        exit 1
+		}
+	} else {
+		if(params.burden) {
+			traits_to_map
+					.spread(vcf.spread(vcf_index))
+					.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+		}
+		if(params.report) {
+			println """
+
+	        ERROR: HTML reports will not be generated because --finemap=FALSE. To generate HTML reports, please set --finemap=TRUE
+
+	        """
+	        exit 1
 		}
 	}
 }
@@ -249,7 +254,8 @@ process fix_strain_names_bulk {
 
 	tag {"BULK TRAIT"}
 
-	publishDir "${params.out}/Phenotypes", mode: 'copy'
+	publishDir "${params.out}/Phenotypes", mode: 'copy', pattern: "*pr_*.tsv"
+	publishDir "${params.out}/Phenotypes", mode: 'copy', pattern: "strain_issues.txt"
 
 	input:
 		file(phenotypes)
@@ -257,12 +263,13 @@ process fix_strain_names_bulk {
 	output:
 		path "pr_*.tsv", emit: fixed_strain_phenotypes 
 		path "Phenotyped_Strains.txt", emit: phenotyped_strains_to_analyze 
+		file("strain_issues.txt")
 
 	"""
 		# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
 		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
 
-		Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.vcf} ${params.fix_names}
+		Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names} ${workflow.projectDir}/bin/strain_isotype_lookup.tsv
 	"""
 
 }
