@@ -4,6 +4,16 @@ library(rrBLUP)
 
 args <- commandArgs(trailingOnly = TRUE)
 
+# arguments
+# 1 - complete geno matrix
+# 2 - ROI geno matrix
+# 3 - processed mapping df
+# 4 - ld file
+# 5 - cpus
+# 6 - p3d
+
+#args <- c("Genotype_Matrix.tsv", "PC1.II:11276295-11838190.ROI_Genotype_Matrix.tsv", "PC1_processed_mapping.tsv", "PC1.II.11276295.11838190.LD.tsv" "1", "false")
+
 
 save_name <- gsub(".LD.tsv", "", args[4])
 
@@ -63,9 +73,6 @@ roi_mapping <- gwa_mapping(data = map_pheno,
 
 roi_ld <- readr::read_tsv(args[4])
 
-head(roi_mapping)
-head(roi_ld)
-
 peakp <- unique(roi_ld$BP_A)
 
 map_peaks <- na.omit(roi_mapping) %>%
@@ -73,12 +80,20 @@ map_peaks <- na.omit(roi_mapping) %>%
 
 map_peaks$POS <- as.numeric(map_peaks$POS)
 
+# add strain genotype to ld file for snpeff later
+roi_genotype <- ROI_matrix %>%
+  tidyr::gather(strain, allele, -c(CHROM:ALT)) %>%
+  dplyr::mutate(allele = ifelse(allele == -1, "REF", ifelse(allele == 1, "ALT", NA))) %>%
+  dplyr::group_by(CHROM, POS, REF, ALT, allele) %>%
+  dplyr::summarize(strains = paste(strain, collapse = ",")) 
+
 pr_roi_ld <- roi_ld %>%
   dplyr::mutate(peak_marker = gsub("_", ":", unique(map_peaks$marker))) %>%
   dplyr::mutate(marker = gsub(":", "_", SNP_B)) %>%
   dplyr::select(peak_marker, peak_maf = MAF_A, marker, maf_marker_b = MAF_B, ld_r2 = R2) %>%
   dplyr::left_join(roi_mapping,., by = "marker") %>%
-  dplyr::filter(value > 0)
+  dplyr::filter(value > 0) %>%
+  dplyr::full_join(roi_genotype)
 
 readr::write_tsv(pr_roi_ld, path = glue::glue("{save_name}_prLD_df.tsv"))
 

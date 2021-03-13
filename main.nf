@@ -8,7 +8,7 @@ nextflow.preview.dsl=2
 date = new Date().format( 'yyyyMMdd' )
 
 params.traitfile = null
-params.vcf 		 = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz"
+params.vcf 		 = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.snpeff.vcf.gz"
 params.p3d 		 = false
 params.sthresh   = "EIGEN"
 params.freqUpper = 0.05
@@ -459,7 +459,7 @@ process summarize_maps {
 
 
 	publishDir "${params.out}/Mappings/Plots", mode: 'copy', pattern: "*mappings.pdf"
-	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*_peaks.tsv"
+	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "QTL_peaks.tsv"
 
     memory { 16.GB * task.attempt }
     errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
@@ -469,7 +469,8 @@ process summarize_maps {
 
 	output:
 	file("*.pdf")
-	path "QTL_peaks.tsv", emit: qtl_peaks
+	path "qtl_peak.tsv", emit: qtl_peaks
+	file("QTL_peaks.tsv")
   	val true, emit: qtl_peaks_done
 
 
@@ -481,9 +482,14 @@ process summarize_maps {
 		cat  *processed_mapping.tsv |\\
 		awk '\$0 !~ "\\tNA\\t" {print}' |\\
 		awk '!seen[\$2,\$4,\$5,\$11,\$12,\$13,\$14,\$17]++' |\\
-		awk 'NR>1{print \$5, \$2, \$12, \$13, \$14,\$4,\$11,\$17}' OFS="\\t" > QTL_peaks.tsv
+		awk 'NR>1{print \$5, \$2, \$12, \$13, \$14,\$4,\$11,\$17}' OFS="\\t" > qtl_peak.tsv
 
-		sig_maps=`wc -l QTL_peaks.tsv | cut -f1 -d' '`
+		# add header to qtl peaks to publish
+		cat qtl_peak.tsv | \
+		awk 'BEGIN{OFS="\\t"; print "trait", "CHROM", "startPOS", "peakPOS", "endPOS", "log10p", "var_exp", "h2"}; 
+			{print \$0}' > QTL_peaks.tsv
+
+		sig_maps=`wc -l qtl_peaks.tsv | cut -f1 -d' '`
 
 		if [ \$sig_maps = 0 ]; then
 			max_log10=`cat *processed_mapping.tsv | awk 'BEGIN {max = 0} {if (\$4>max && \$4!= "log10p") max=\$4} END {print max}'`
@@ -637,7 +643,6 @@ process rrblup_fine_maps {
 
 
 	output:
-		//tuple path("*pdf"), path("*prLD_df.tsv")
 		tuple val(TRAIT), path(phenotype), path(roi_geno_matrix), path("*prLD_df.tsv"), emit: prLD
 		tuple path("*pdf"), path("*prLD_df.tsv")
 
@@ -693,7 +698,7 @@ process concatenate_LD_per_trait {
 		done
 
 		cat *pr_ld.tsv |\
-		awk 'BEGIN{OFS="\\t"; print "marker", "CHROM", "POS", "log10p", "peak_marker", "peak_maf", "maf_marker_b", "ld_r2", "trait", "start_pos", "end_pos"}; 
+		awk 'BEGIN{OFS="\\t"; print "marker", "CHROM", "POS", "log10p", "peak_marker", "peak_maf", "maf_marker_b", "ld_r2", "REF", "ALT", "allele", "strain", "trait", "start_pos", "end_pos"}; 
 			{print \$0}' > ${TRAIT}.combined_peak_LD.tsv
 	"""
 
@@ -860,14 +865,14 @@ process html_region_prep_table {
 
 
   input:
-    file("QTL_peaks.tsv")
+    file("qtl_peak.tsv")
   output:
     tuple file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_isotype_list.txt"), emit: div_hap_table
     val true, emit: html_region_prep_table_done
 
 
   """
-  cat QTL_peaks.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
+  cat qtl_peak.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
 
   bedtools intersect -wa -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_bins.bed
 

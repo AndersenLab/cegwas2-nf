@@ -41,6 +41,8 @@ if(length(test_out) > 0) {
     }
 }
 
+# update 20210312 KSE: avoid crashing by using one strain to get the snpeff annotations
+
 snpeff_out <- list()
 for(r in 1:nrow(query_regions)){
   cq <- query_regions$CHROM[r]
@@ -49,15 +51,16 @@ for(r in 1:nrow(query_regions)){
 
   snpeff_out[[r]] <- cegwas2::query_vcf(glue::glue("{cq}:{sq}-{eq}"),
                                         impact = "ALL",
-                                        samples = unique(phenotypes$strain),
+                                        #samples = unique(phenotypes$strain),
+                                        samples = "CB4856",
                                         vcf = q_vcf) %>%
-    dplyr::select(CHROM:ALT, strain = SAMPLE, allele = a1, effect:transcript_biotype, nt_change:aa_change)%>%
-    dplyr::distinct(CHROM, POS, strain, REF, ALT, .keep_all = T) %>%
+    dplyr::select(CHROM:ALT, effect:transcript_biotype, nt_change:aa_change)%>%
+    dplyr::distinct(CHROM, POS, .keep_all = T) %>%
     tidyr::unite(marker, CHROM, POS, sep = "_")
 }
 
 snpeff_df <- dplyr::bind_rows(snpeff_out) %>%
-  dplyr::left_join(pr_trait_ld, ., by = "marker")
+  dplyr::left_join(pr_trait_ld, ., by = c("marker", "REF", "ALT"))
 
 genes_in_region <- gene_ref_flat %>%
   dplyr::filter(wbgene %in% snpeff_df$gene_id) %>%
@@ -67,8 +70,8 @@ genes_in_region <- gene_ref_flat %>%
 
 ugly_genes_in_region <- genes_in_region%>%
   dplyr::left_join(snpeff_df, ., by = "gene_id") %>%
-  dplyr::distinct(marker, CHROM, POS, log10p, peak_marker, strain, impact, .keep_all = T) %>%
-  dplyr::left_join(., phenotypes, by = "strain")
+  dplyr::distinct(marker, CHROM, POS, log10p, peak_marker, strain, impact, .keep_all = T)
+  #dplyr::left_join(., phenotypes, by = "strain")
 
 tidy_genes_in_region <- genes_in_region%>%
   dplyr::left_join(snpeff_df, ., by = "gene_id") %>%
@@ -82,7 +85,7 @@ tidy_genes_in_region <- genes_in_region%>%
                 PEAK_MARKER = peak_marker, PEAK_MAF = peak_maf, TRAIT = trait,
                 QTL_INTERVAL_START = start_pos, QTL_INTERVAL_END = end_pos,
                 VARIANT_LD_WITH_PEAK_MARKER = ld_r2, VARIANT_LOG10p = log10p,
-                STRAIN = strain, STRAIN_GENOTYPE = allele, Phenotype_Value)
+                STRAIN = strain, STRAIN_GENOTYPE = allele)
 
 write_tsv(tidy_genes_in_region,
           path = glue::glue("{analysis_trait}_snpeff_genes.tsv"))
