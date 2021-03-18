@@ -479,23 +479,23 @@ process summarize_maps {
 		
     Rscript --vanilla Summarize_Mappings.R
 
-		cat  *processed_mapping.tsv |\\
-		awk '\$0 !~ "\\tNA\\t" {print}' |\\
-		awk '!seen[\$2,\$4,\$5,\$11,\$12,\$13,\$14,\$17]++' |\\
-		awk 'NR>1{print \$5, \$2, \$12, \$13, \$14,\$4,\$11,\$17}' OFS="\\t" > qtl_peak.tsv
+	cat  *processed_mapping.tsv |\\
+	awk '\$0 !~ "\\tNA\\t" {print}' |\\
+	awk '!seen[\$2,\$4,\$5,\$11,\$12,\$13,\$14,\$17]++' |\\
+	awk 'NR>1{print \$5, \$2, \$12, \$13, \$14,\$4,\$11,\$17}' OFS="\\t" > qtl_peak.tsv
 
-		# add header to qtl peaks to publish
-		cat qtl_peak.tsv | \
-		awk 'BEGIN{OFS="\\t"; print "trait", "CHROM", "startPOS", "peakPOS", "endPOS", "log10p", "var_exp", "h2"}; 
-			{print \$0}' > QTL_peaks.tsv
+	# add header to qtl peaks to publish
+	cat qtl_peak.tsv | \
+	awk 'BEGIN{OFS="\\t"; print "trait", "CHROM", "startPOS", "peakPOS", "endPOS", "log10p", "var_exp", "h2"}; 
+		{print \$0}' > QTL_peaks.tsv
 
-		sig_maps=`wc -l qtl_peaks.tsv | cut -f1 -d' '`
+	sig_maps=`wc -l qtl_peaks.tsv | cut -f1 -d' '`
 
-		if [ \$sig_maps = 0 ]; then
-			max_log10=`cat *processed_mapping.tsv | awk 'BEGIN {max = 0} {if (\$4>max && \$4!= "log10p") max=\$4} END {print max}'`
-			echo "NO TRAITS HAD SIGNIFICANT MAPPINGS - MAXIMUM -log10p IS \$max_log10 - CONSIDER SETTING BF THRESHOLD BELOW THIS VALUE"
-			exit
-		fi
+	if [ \$sig_maps = 0 ]; then
+		max_log10=`cat *processed_mapping.tsv | awk 'BEGIN {max = 0} {if (\$4>max && \$4!= "log10p") max=\$4} END {print max}'`
+		echo "NO TRAITS HAD SIGNIFICANT MAPPINGS - MAXIMUM -log10p IS \$max_log10 - CONSIDER SETTING BF THRESHOLD BELOW THIS VALUE"
+		exit
+	fi
 	"""
 }
 
@@ -948,6 +948,29 @@ workflow.onComplete {
     Error report: ${workflow.errorReport ?: '-'}
     Git info: $workflow.repository - $workflow.revision [$workflow.commitId]
 
+    { Parameters }
+    ---------------------------
+	Phenotype File                          = ${params.traitfile}
+	VCF                                     = ${params.vcf}
+	CeNDR Release                           = ${params.cendr_v}
+	Gene File                               = ${params.genes}
+	Annotation File                         = ${params.refflat}
+
+	Significance Threshold                  = ${params.sthresh}
+	P3D                                     = ${params.p3d}
+	Max AF for Burden Mapping               = ${params.freqUpper}
+	Min Strains with Variant for Burden     = ${params.minburden}
+	Threshold for grouping QTL              = ${params.group_qtl}
+	Number of SNVs to define CI             = ${params.ci_size}
+	Fix isotype names and prune data        = ${params.fix_names}
+	Eigen Memory allocation                 = ${params.eigen_mem}
+	Path to R libraries.                    = ${params.R_libpath}
+
+	Burden mapping                          = ${params.burden}
+	Fine mapping                            = ${params.finemap}
+	HTML report generation                  = ${params.report}
+	Result Directory                        = ${params.out}
+
     """
 
     println summary
@@ -959,9 +982,9 @@ workflow.onComplete {
     }
 
     // mail summary
-    if (params.email) {
-        ['mail', '-s', 'cegwas2-nf', params.email].execute() << summary
-    }
+    //if (params.email) {
+    //    ['mail', '-s', 'cegwas2-nf', params.email].execute() << summary
+    //}
 
 
 }

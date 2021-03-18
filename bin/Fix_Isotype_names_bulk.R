@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 library(tidyverse)
-#library(cegwas2)
 library(data.table)
 
 args <- commandArgs(trailingOnly = TRUE)
