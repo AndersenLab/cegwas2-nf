@@ -14,7 +14,6 @@ output:
 
 ## Usage
 
-* All strain names were converted to the corresponding isotype name, which can be looked up here: https://www.elegansvariation.org/strain/strain_data.tsv
 * This R Markdown file imports data tables within Analysis_Results-Date folder and will knit without any modification.
 <br>
 * Features for the interactive plots: 
@@ -42,6 +41,22 @@ library("plotly", lib.loc = library.path)
 library("DT", lib.loc = library.path)
 ```
 
+## Strain Issues
+
+All strain names were converted to the corresponding isotype name, which can be looked up here: https://www.elegansvariation.org/strain/strain_data.tsv. If you submitted replicate data, replicates for a given isotype were averaged to one mean value.
+
+```{r}
+
+strain_issues <- readLines("Phenotypes/strain_issues.txt")
+
+new <- grep(strain_issues, "WARNING:", value = T)
+if(length(new) == 0) {
+  print("No strain issues to report")
+} else {
+  print(new)
+}
+
+```
 
 
 ```{r}
@@ -151,7 +166,7 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
         
     QTL_peaks <- read.delim("Mappings/Data/QTL_peaks.tsv", header=FALSE, stringsAsFactors=FALSE) %>% 
         dplyr::filter(V1 == trait_name)  %>% 
-        dplyr::rename(Trait = V1, Chrom = V2, Region_start = V3, Peak = V4, Region_end = V5) 
+        dplyr::rename(Trait = V1, Chrom = V2, Region_start = V3, Peak = V4, Region_end = V5, log10p = V6, var_exp = V7, narrow_h2 = V8) 
     
     
     if (nrow(QTL_peaks) < 2) { 
@@ -167,7 +182,7 @@ if (file.info("Mappings/Data/QTL_peaks.tsv")$size!=0) {
 
 
         QTL_peaks <- QTL_peaks %>%
-            dplyr::mutate(Region_width = Region_end - Region_start) %>% 
+            dplyr::mutate(Region_width = as.numeric(Region_end) - as.numeric(Region_start)) %>% 
             dplyr::filter(Region_width < 1500000)
         
         if (nrow(QTL_peaks)==0) {

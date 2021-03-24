@@ -26,9 +26,9 @@ resolve_isotypes <- function(...) {
             unique()
         
         if (length(isotype) == 0) {
-            message(glue::glue("{x} is not a known strain. Isotype set to NA; Please check CeNDR"))
+            message(glue::glue("WARNING: {x} is not a known strain. Isotype set to NA; Please check CeNDR"))
         } else if (length(isotype) > 1) {
-            message(glue::glue("{x} resolves to multiple isotypes. Isotype set to NA; Please check CeNDR"))
+            message(glue::glue("WARNING: {x} resolves to multiple isotypes. Isotype set to NA; Please check CeNDR"))
         }
         if (length(isotype) != 1) {
             isotype <- NA
@@ -210,7 +210,7 @@ process_phenotypes <- function(df,
                                threshold = 2){
     
     if ( sum(grepl(colnames(df)[1], "Strain", ignore.case = T)) == 0 ) {
-        message(glue::glue("Check input data format, strain should be the first column."))
+        message(glue::glue("WARNING: Check input data format, strain should be the first column."))
     }
     
     # ~ ~ ~ # resolve strain isotypes # ~ ~ ~ #
@@ -225,7 +225,7 @@ process_phenotypes <- function(df,
         
         strains_to_remove <- unique(non_isotype_strains$strain)
         
-        message(glue::glue("Removing strain(s) {strains_to_remove} because they do not fall into a defined isotype."))
+        message(glue::glue("WARNING: Removing strain(s) {strains_to_remove} because they do not fall into a defined isotype."))
         
         df_non_isotypes_removed <- dplyr::filter( df, !( strain %in% strains_to_remove) )
     } else {
@@ -263,7 +263,7 @@ process_phenotypes <- function(df,
             fix <- df %>%
                 dplyr::mutate(strain = isotype) %>%
                 dplyr::select(-ref_strain, -num)
-            message(glue::glue("Non-isotype reference strain {df$strain[1]} renamed to isotype {i}."))
+            message(glue::glue("WARNING: Non-isotype reference strain {df$strain[1]} renamed to isotype {i}."))
         } else {
             # remove non-isotype strains
             fix <- df %>%
@@ -272,11 +272,10 @@ process_phenotypes <- function(df,
             
             # warn the user
             if(sum(df$ref_strain) > 0) {
-                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed."))
+                message(glue::glue("WARNING: Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed."))
             } 
             else {
-                message(glue::glue("Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed.
-                                                   To include this isotype in the analysis, you can (1) phenotype {i} or (2) evaluate the similarity of these strains and choose one representative for the group."))
+                message(glue::glue("WARNING: Non-isotype reference strain(s) {paste(df %>% dplyr::filter(!ref_strain) %>% dplyr::pull(strain) %>% unique(), collapse = ', ')} from isotype group {i} removed. To include this isotype in the analysis, you can (1) phenotype {i} or (2) evaluate the similarity of these strains and choose one representative for the group."))
             }
             }
         # add to data
@@ -289,7 +288,7 @@ process_phenotypes <- function(df,
             if(summarize_replicates == "mean") dplyr::summarise(., phenotype = mean(as.numeric(phenotype), na.rm = T ) )
             else if(summarize_replicates == "median") dplyr::summarise(., phenotype = median(as.numeric(phenotype), na.rm = T ) )
             #else if(summarize_replicates == "none") dplyr::mutate(., phenotype = as.numeric(phenotype))
-            else  message(glue::glue("Please choose mean or median as options for summarizing replicate data.")) } %>%
+            else  message(glue::glue("WARNING: Please choose mean or median as options for summarizing replicate data.")) } %>%
         dplyr::rename(strain = isotype) %>%
         dplyr::ungroup()
     
@@ -316,7 +315,7 @@ process_phenotypes <- function(df,
                 if (prune_method == "MAD") dplyr::transmute_if(., is.numeric, dplyr::funs( outlier = is_out_mad ) )
                 else if (prune_method == "TUKEY") dplyr::transmute_if(., is.numeric, dplyr::funs( outlier = is_out_tukey ) )
                 else if (prune_method == "Z") dplyr::transmute_if(., is.numeric, dplyr::funs( outlier = is_out_z ) )
-                else message(glue::glue("Please choose BAMF, MAD, TUKEY, or Z as options for summarizeing replicate data.")) } %>%
+                else message(glue::glue("WARNING: Please choose BAMF, MAD, TUKEY, or Z as options for summarizeing replicate data.")) } %>%
             dplyr::ungroup() %>%
             dplyr::bind_cols(., dplyr::ungroup(df_replicates_summarized)) %>%
             dplyr::select(strain, trait, phenotype, outlier)
