@@ -726,18 +726,18 @@ process plot_genes {
 	cpus 1
     memory { 32.GB * task.attempt }
     //errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
 
 	tag {phenotype}
 
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*.pdf"
-	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*_genes.tsv"
+	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*genes.tsv"
 
 	input:
 		tuple path(genes), val(TRAIT), path(ld), path(phenotype), path(ann)
 
 	output:
-		tuple val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf"), emit: gene_plts
+		tuple val(TRAIT), file("*genes.tsv"), file("*pdf"), emit: gene_plts
     	val TRAIT, emit: gene_plts_done
 
 	"""
