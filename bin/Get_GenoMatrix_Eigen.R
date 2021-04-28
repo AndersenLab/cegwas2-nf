@@ -1,6 +1,6 @@
 library(Rcpp)
 library(tidyverse)
-library(coop) ## no longer available
+library(coop)
 library(RSpectra)
 
 args <- commandArgs(trailingOnly = TRUE)
