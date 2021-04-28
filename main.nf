@@ -28,8 +28,8 @@ params.help 	 = null
 params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
 params.debug       = null
 params.out       = "Analysis_Results-${date}"
-params.annotation = null
-params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.${params.vcf}.${params.annotation}-annotation.tsv"
+// add a param for local instead of quest
+params.quest    = true
 
 if(params.debug) {
 	    println """
@@ -41,16 +41,41 @@ if(params.debug) {
 	    params.vcf = "330_TEST.vcf.gz"
 	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
 	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
-      impute_vcf = vcf //use same vcf for finemap and mapping in debug
-      impute_vcf_index = vcf_index
+      	impute_vcf = vcf //use same vcf for finemap and mapping in debug
+      	impute_vcf_index = vcf_index
 	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
+	    params.annotation = "snpeff"
+	    params.annvcf = "${workflow.projectDir}/bin/WI.20210121.snpeff-annotation.tsv"
 	} else { 
-      params.vcf = "20210121"
-      vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
-		  vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
-		  impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz")
-      impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
+		if(params.quest) {
+			params.vcf = "20210121"
+	      	vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
+			vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
+			impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz")
+	      	impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
+	      	// right now this is the only one we have...
+			params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20210121.${params.annotation}-annotation.tsv"
+			if(params.vcf != "20210121") {
+				println("WARNING. VCF annotations from the 20210121 will be used.")
+			}
+		} else {
+			params.vcf = "20210121"
+			pull_vcf()
+
+	      	vcf = pull_vcf.out.hard_vcf
+			vcf_index = pull_vcf.out.hard_vcf_index
+			impute_vcf = pull_vcf.out.impute_vcf
+	      	impute_vcf_index = pull_vcf.out.impute_vcf_index
+	      	println("WARNING. Pulling vcf from CeNDR -- No annotation will be used.")
+	      	// need annotattion for outside of quest
+	      	// right now this is the only one we have...
+			//params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20210121.${params.annotation}-annotation.tsv"
+		}
+
    }
+
+
+
 
 println()
 
@@ -73,14 +98,14 @@ if (params.help) {
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."
-    log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
-    log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
+
     log.info "----------------------------------------------------------------"
     log.info "----------------------------------------------------------------"
    	log.info "Optional arguments (General):"
    	log.info "--out                    String                Name of folder that will contain the results"
+   	log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
+    log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
     log.info "--e_mem                  String                Value that corresponds to the amount of memory to allocate for eigen decomposition of chromosomes (DEFAULT = 100)"
-    log.info "--cendr_v                String                CeNDR release (DEFAULT = 20210121)"
     log.info "--burden                 BOOLEAN               Whether or not to perform burden mapping (DEFAULT = TRUE). NOTE: HTML report will not be generated if burden is set to FALSE."
     log.info "--finemap                BOOLEAN               Whether or not to perform fine-mapping (DEFAULT = TRUE)"
     log.info "--report                 BOOLEAN               Whether or not to generate HTML report for each trait (DEFAULT = TRUE). Change to FALSE if you are mapping many traits. Requires burden = TRUE to run."
@@ -119,9 +144,8 @@ if (params.help) {
 log.info ""
 log.info "Phenotype File                          = ${params.traitfile}"
 log.info "VCF                                     = ${params.vcf}"
-log.info "CeNDR Release                           = ${params.cendr_v}"
+log.info "Annotation type                         = ${params.annotation}"
 log.info "Gene File                               = ${params.genes}"
-log.info "Annotation File                         = ${params.refflat}"
 log.info ""
 log.info "------------------------------------------------------------"
 log.info ""
@@ -194,10 +218,13 @@ workflow {
 		rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
 
 
-		// Plot fine map
-		Channel.fromPath("${params.genes}")
+		// Plot fine map\
+		if(params.quest) {
+			Channel.fromPath("${params.genes}")
 				.spread(concatenate_LD_per_trait.out)
 				.spread(Channel.fromPath("${params.annvcf}")) | plot_genes
+		}
+
 
 		// Burden mapping
 		if(params.burden) {
@@ -253,12 +280,18 @@ process pull_vcf {
 	executor 'local'
 
 	output:
-		path "*.vcf.gz", emit: dl_vcf 
-		path "*.vcf.gz.tbi", emit: dl_vcf_index 
+		path "*hard-filter.isotype.vcf.gz", emit: hard_vcf 
+		path "*hard-filter.isotype.vcf.gz.tbi", emit: hard_vcf_index 
+		path "*impute.isotype.vcf.gz", emit: impute_vcf 
+		path "*impute.isotype.vcf.gz.tbi", emit: impute_index 
 
 	"""
-		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.cendr_v}/variation/WI.${params.cendr_v}.hard-filter.isotype.vcf.gz
-		tabix -p vcf WI.${params.cendr_v}.hard-filter.isotype.vcf.gz
+		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.hard-filter.isotype.vcf.gz
+		tabix -p vcf WI.${params.vcf}.hard-filter.isotype.vcf.gz
+
+		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.impute.isotype.vcf.gz
+		tabix -p vcf WI.${params.vcf}.impute.isotype.vcf.gz
+
 	"""
 }
 

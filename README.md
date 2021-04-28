@@ -24,19 +24,30 @@ source activate /projects/b1059/software/conda_envs/nf20_env
 1. [nextflow-v20.0+](https://www.nextflow.io/docs/latest/getstarted.html)
 1. [BCFtools-v1.9](https://samtools.github.io/bcftools/bcftools.html)
 1. [plink-v1.9](https://www.cog-genomics.org/plink2)
-1. [bedtools](XXX)
+1. [bedtools-2.29.2](https://bedtools.readthedocs.io/en/latest/content/installation.html)
 1. [R-cegwas2](https://github.com/AndersenLab/cegwas2)
 1. [R-tidyverse-v1.2.1](https://www.tidyverse.org/)
-1. [R-coop](XXX)
+1. [R-coop-0.6-2](https://cran.r-project.org/web/packages/coop/index.html)
 1. [R-rrBLUP-v4.6](https://cran.r-project.org/web/packages/rrBLUP/rrBLUP.pdf)
-1. [R-plotly](XXX)
-1. [R-DT](XXX)
-1. [R-data.table](XXX)
-1. [R-Rcpp](XXX)
-1. [R-genetics](XXX)
-1. [R-sommer](XXX)
+1. [R-plotly-4.9.2](https://cran.r-project.org/web/packages/plotly/index.html)
+1. [R-DT-0.12](https://cran.r-project.org/web/packages/DT/index.html)
+1. [R-data.table-1.12.8](https://cran.r-project.org/web/packages/data.table/index.html)
+1. [R-Rcpp-1.0.1](https://cran.r-project.org/web/packages/Rcpp/index.html)
+1. [R-genetics-1.3.8.1.2](https://cran.r-project.org/web/packages/genetics/index.html)
+1. [R-sommer-4.0.4](https://cran.r-project.org/web/packages/sommer/index.html)
 1. [R-RSpectra-v0.13-1](https://github.com/yixuan/RSpectra)
+1. [pandoc=2.12](https://pandoc.org/installing.html)
+1. [R-knitr-1.28](https://cran.r-project.org/web/packages/knitr/index.html)
+1. [R-rmarkdown-2.1](https://cran.r-project.org/web/packages/rmarkdown/index.html)
+1. [R-cowplot-1.0.0](https://cran.r-project.org/web/packages/cowplot/index.html)
 1. [R-ggbeeswarm-v0.6](https://github.com/eclarke/ggbeeswarm)
+
+## Required data for running outside of QUEST
+
+1. VCF(s)
+   - A hard-filtered vcf containing phenotyped samples for mapping
+   - A tabix-generated index hard-filtered vcf (.tbi)
+   - An imputed vcf
 
 ## Testing pipeline using Nextflow
 Running debug mode is a good way to quickly test if your environment is set up correctly. Entire debug run should take 2-3 minutes.
@@ -49,7 +60,7 @@ nextflow main.nf --debug
 ```
 git clone https://github.com/AndersenLab/cegwas2-nf.git
 cd cegwas2-nf
-nextflow main.nf --traitfile <path to traitfile> [optional parameters, see below]
+nextflow main.nf --traitfile <path to traitfile> --annotation bcsq [optional parameters, see below]
 ```
 
 ### Profiles
@@ -71,6 +82,8 @@ Users can select from a number of profiles that each run different processes for
 | ECA640 | 34.065378 | 12.32 |
 | ... | ... | ... | 124.33 |
 | ECA250 | 34.096 | 23.1 |
+
+* `--annotation` - Users can choose between "snpeff" annotation or "bcsq" annotation. Currently, annotation is only set up with the 20210121 release.
 
 * `nextflow main.nf --help` - will display the help message
 
