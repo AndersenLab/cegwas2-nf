@@ -1,140 +1,39 @@
-# cegwas2-nf
-GWA mapping with C. elegans
+# Cegwas2-nf branches
+### manplot_only branch
+- Use this branch if you're screening lots of traits.
+- Will only run the main mapping step and write out manhattan plots, pheno-geno plots and the underlying tables.
+- Errors will be ignored to let all traits finish. 
+- Uses docker container andersenlab/cegwas2:latest. 
+- On Quest need `module add singularity`
 
+### report branch
+- Use this branch if you only have a few traits.
+- Will generate html report containing all plots in interactive formats for each trait and each QTL. Divergent region and haplotype plot uses Daehan's data with 2018 isotypes. They contain BOTH isotype names and strain names so should work both ways. 
+- Fine mapping will use gene annotation in vcf, whereas burden mapping uses annotation WS245 in /bin, which have some differences.
+- If one downloads the "Analysis-Results-data" folder, the Rmarkdown files should knit without any modifications (given all libraries are installed).
+- The environment is set up via Conda and module/R.3.6.0 on Quest b/c I couldn't build 1 required package into the docker container. 
+- On Quest need `module add python/anaconda`. Module for R is set up in nextflow.config.
 
-## Overview of the workflow
+### master branch
+- Left unchanged since 2019 Stefan's commit. In case need to reproduce results.
 
-![alt text](https://github.com/AndersenLab/cegwas2-nf/blob/master/images/Cegwas2_flow_v2.png)
+# Important notes and updates
+### `process fix_strain_names_bulk`
+- This process by default will take the strain list and convert strain names to the corresponding isotype names. Multiple strains within the same isotype will have their trait averaged. This was needed b/c (1) we used to only have variants for isotypes, and not for strains (2) one should only use 1 strain per isotype for mapping, b/c using strains very similar to each other will lead to artifacts in GWAS.
+- In older version: `--fix_names=no` (or anything not “fix”) will skip the step above, and at the same time skip a outlier pruning step in cegwas2::process_phenotype. 
+- **In current version, `--fix_names` is no longer used. Instead, the decision will be made based on the input vcf automatically. If the vcf name contains "20180527.imputed" (such as the default one in cegwas2-nf/bin), the old behavior will apply. Otherwise, strain names will not be converted or changed, but pruning will be done. In which case, the input vcf MUST have the same strain names as the trait file, and it's the users' responsiblity to make sure there is only 1 strain per isotype in input trait files.**
+- **To implement it in your own version, copy over "bin/Fix_strain_names_bulk_new.R", and change the script in this process to be**
+`Rscript --vanilla ${workflow.projectDir}/bin/Fix_Isotype_names_bulk_new.R ${phenotypes} ${params.vcf}` 
+[Example here](https://github.com/AndersenLab/cegwas2-nf/commit/b54afbc2d76db20f0744fdbd11634516aa05565f).
 
-## Required software packages that should be in users PATH
+### `process vcf_to_geno_matrix`
+- `bcftools filter -i N_MISSING=0` will remove all variants that is `./.` (missing, unassigned) in any samples
+- Hard filtered vcf has a lot of sites with `./.`, and imputation will fill these sites with `0/0` or `1/1` based on similarity of nearby sites with other strains. After the filtering step above, hard filtered vcf will have only 1/3 of the variants left comparing to imputed vcf. So we have more confidence in variants in hard filtered vcf, but much less markers will be included for mapping leading to less spatial resolution.
 
-1. [R-v3.4.1](https://www.r-project.org/)
-1. [nextflow-v19.07.0](https://www.nextflow.io/docs/latest/getstarted.html)
-1. [BCFtools-v1.9](https://samtools.github.io/bcftools/bcftools.html)
-1. [plink-v1.9](https://www.cog-genomics.org/plink2)
-1. [R-cegwas2](https://github.com/AndersenLab/cegwas2)
-1. [R-tidyverse-v1.2.1](https://www.tidyverse.org/)
-1. [R-correlateR](https://github.com/AEBilgrau/correlateR)
-1. [R-rrBLUP-v4.6](https://cran.r-project.org/web/packages/rrBLUP/rrBLUP.pdf)
-1. [R-RSpectra-v0.13-1](https://github.com/yixuan/RSpectra)
-1. [R-ggbeeswarm-v0.6](https://github.com/eclarke/ggbeeswarm)
+### `process plot_genes`
+- If the input vcf doesn’t contain annotation by snpeff (which, imputed vcfs don’t, hard filtered vcfs do), cegwas2 will download the very large soft-filtered vcf from Cendr and import into R. This is likely the reason this step takes so much memory. 
+- The memory allocation now dynamically depends on how many times the excecution fails. So no manual adjustment of memory for this step should be needed.
 
-## Execution of pipeline using Nextflow
-```
-git clone https://github.com/AndersenLab/cegwas2-nf.git
-cd cegwas2-nf
-nextflow main.nf --traitfile=test_traits.tsv --vcf=bin/WI.20180527.impute.vcf.gz --p3d=TRUE --sthresh=BF
-```
-### Parameters
-
-* `nextflow main.nf --help` - will display the help message
-
-#### One of the two trait parameters is required:
-
-* `--traitfile` - is a tab-delimited formatted (.tsv) file that contains trait information.  Each phenotype file should be in the following format (replace trait_name with the phenotype of interest):
-
-| strain | trait_name_1 | trait_name_2 |
-| --- | --- | --- |
-| JU258 | 32.73 | 19.34 |
-| ECA640 | 34.065378 | 12.32 |
-| ... | ... | ... | 124.33 |
-| ECA250 | 34.096 | 23.1 |
-
-#### Required mapping parameters
-* `--p3d` - This determines what type of kinship correction to perform prior to mapping. `TRUE` corresponds to the EMMAx method and `FALSE` corresponds to the slower EMMA method. We recommend running with `--p3d=TRUE` to make sure all files of the required files are present and in the proper format, then run with `--p3d=FALSE` for a more exact mapping.
-
-* `--sthresh` - This determines the signficance threshold required for performing post-mapping analysis of a QTL. `BF` corresponds to Bonferroni correction, `EIGEN` corresponds to correcting for the number of independent markers in your data set, and `user-specified` corresponds to a user-defined threshold, where you replace user-specified with a number. For example `--sthresh=4` will set the threshold to a `-log10(p)` value of 4. We recommend using the strict `BF` correction as a first pass to see what the resulting data looks like. If the pipeline stops at the `summarize_maps` process, no significant QTL were discovered with the input threshold. You might want to consider lowering the threshold if this occurs. 
-
-#### Optional parameters
-* `--vcf` - is a VCF file with variant data. All strains with phenotypes should be represented in the VCF used for mapping. There should also abe a tabix-generated index file (.tbi) in the same folder as the specified VCF file that has the same name as the VCF except for the addition of the `.tbi` extension. (generated using `tabix -p vcf vcfname.vcf.gz`). If this flag is not used a VCF for the C. elegans species will be downloaded from [CeNDR](https://elegansvariation.org/data/release/latest)
-
-* `--freqUpper` - Upper bound for variant allele frequency for a variant to be considered for burden mapping. Default = 0.5
-
-* `--minburden` - The number of strains that must share a variant for that variant to be considered for burden mapping. Default = 2
-
-* `--refflat` - Genomic locations for genes used for burden mapping. A default generated from WS245 is provided in the repositories bin. 
-
-* `--genes` - Genomic locations for genes formatted for plotting purposes. A default generated from WS245 is provided in the repositories bin.
-
-* `--fix_names` - This will query the CeNDR strain set an resolve any discrepancies between your strain set and isotype names on CeNDR. This is important if you are not providing your own VCF, however if you provide your own VCF that contains the strains you phenotyped, you do not need to fix strain names (Default = "fix", change to anything but fix to skip).
-
-### R scripts
-
-* `Get_GenoMatrix_Eigen.R` - Takes a genotype matrix and chromosome name as input and identifies the number significant eigenvalues.
-* `Fix_Isotype_names.R` - Take sample names present in phenotype data and changes them to isotype names found on [CeNDR](elegansvariation.org) when the `--traitdir` flag is used.
-* `Run_Mappings.R` - Performs GWA mapping using the rrBLUP R package and the EMMA or EMMAx algorithm for kinship correction. Generates manhattan plot and phenotype by genotype plot for peak positions.
-* `Summarize_Mappings.R` - Generates plot of all QTL identified in nextflow pipeline.
-* `Finemap_QTL_Intervals.R` - Run EMMA/EMMAx on QTL region of interest. Generates fine map plot, colored by LD with peak QTL SNV found from genome-wide scan
-* `plot_genes.R` - Runs SnpEff and generates gene plot. 
-* `makeped.R` - Converts trait `.tsv` files to `.ped` format for burden mapping.
-* `rvtest` - Executable to run burden mapping, can be found at the [RVtests homepage](https://github.com/zhanxw/rvtests)
-* `plot_burden.R` - Plots the results from burden mapping.
-* `Fix_Isotype_names_bulk.R` - Take sample names present in phenotype data and changes them to isotype names found on [CeNDR](elegansvariation.org) when the `--traitfile` flag is used.
-
-### Output Folder Structure
-
-```
-Genotype_Matrix
-  ├── Genotype_Matrix.tsv
-  ├── total_independent_tests.txt
- Mappings
-  ├── Data             
-      ├── traitname_processed_mapping.tsv
-      ├── QTL_peaks.tsv
-  ├── Plots   
-      ├── traitname_manplot.pdf
-      ├── traitname_pxgplot.pdf
-      ├── Summarized_mappings.pdf
- Fine_Mappings
-  ├── Data             
-      ├── traitname_snpeff_genes.tsv
-  ├── Plots   
-      ├── traitname_qtlinterval_finemap_plot.pdf
-      ├── traitname_qtlinterval_gene_plot.pdf
- BURDEN
-  ├── VT             
-      ├── Data             
-          ├── traitname.VariableThresholdPrice.assoc
-      ├── Plots   
-          ├── traitname_VTprice.pdf
-  ├── SKAT   
-      ├── Data             
-          ├── traitname.Skat.assoc
-      ├── Plots   
-          ├── traitname_SKAT.pdf
-```
-
-#### Genotype_Matrix folder
-* `Genotype_Matrix.tsv` - pruned LD-pruned genotype matrix used for GWAS and construction of kinship matrix
-* `total_independent_tests.txt` - number of independent tests determined through spectral decomposition of the genotype matrix
-
-#### Mappings folder
-
-##### Data
-* `traitname_processed_mapping.tsv` - Processed mapping data frame for each trait mapped
-* `QTL_peaks.tsv` - List of signifcant QTL identified across all traits
-
-##### Plots
-* `traitname_manplot.pdf` - Manhattan plot for each trait that was analyzed. Two significance threshold lines are present, one for the Bonferronit corrected threshold, and another for the spectral decomposition threshold.
-* `traitname_pxgplot.pdf` - Phenotype by genotype split at peak QTL positions for every significant QTL identified
-* `Summarized_mappings.pdf` - A summary plot of all QTL identified
-
-#### Fine_Mappings folder
-
-##### Data
-* `traitname_snpeff_genes.tsv` - Fine-mapping data frame for all significant QTL
-
-##### Plots
-* `traitname_qtlinterval_finemap_plot.pdf` - Fine map plot of QTL interval, colored by marker LD with the peak QTL identified from the genome-wide scan
-* `traitname_qtlinterval_gene_plot.pdf` - variant annotation plot overlaid with gene CDS for QTL interval
-
-
-#### BURDEN folder (Contains two subfolders VT/SKAT with the same structure)
-
-##### Data
-* `traitname.VariableThresholdPrice.assoc` - Genome-wide burden mapping result using VT price, see [RVtests homepage](https://github.com/zhanxw/rvtests)
-* `traitname.Skat.assoc` - Genome-wide burden mapping result using Skat, see [RVtests homepage](https://github.com/zhanxw/rvtests)
-
-##### Plots
-* `traitname_VTprice.pdf` - Genome-wide burden mapping manhattan plot for VTprice
-* `traitname_SKAT.pdf` - Genome-wide burden mapping manhattan plot for Skat
+### Error in QTL on mtDNA
+- Usually if there is a QTL on mtDNA, it will end up with a size of 1bp and throws errors in some processes. 
+- Cegwas2 finds the peak marker, and defines interval of QTL by n markers to the left, and n markers to the right from the peak. on main chromosomes, cegwas2 will detect whether the marker is at end of chromosome to make sure QTL doesn't go beyond chromosome boundary. but it is not detecting it for MtDNA. Since MtDNA is so small, the peak +/- n markers usually go beyond the length of full MtDNA, in which case the QTL length will be artificially set to be 1bp.
