@@ -20,16 +20,21 @@ source activate /projects/b1059/software/conda_envs/nf20_env
 
 *These packages should be in the user's PATH* 
 
-*I don't think this is complete...*
-
 1. [R-v3.6.0](https://www.r-project.org/)
 1. [nextflow-v20.0+](https://www.nextflow.io/docs/latest/getstarted.html)
 1. [BCFtools-v1.9](https://samtools.github.io/bcftools/bcftools.html)
 1. [plink-v1.9](https://www.cog-genomics.org/plink2)
+1. [bedtools](XXX)
 1. [R-cegwas2](https://github.com/AndersenLab/cegwas2)
 1. [R-tidyverse-v1.2.1](https://www.tidyverse.org/)
-1. [R-correlateR](https://github.com/AEBilgrau/correlateR)
+1. [R-coop](XXX)
 1. [R-rrBLUP-v4.6](https://cran.r-project.org/web/packages/rrBLUP/rrBLUP.pdf)
+1. [R-plotly](XXX)
+1. [R-DT](XXX)
+1. [R-data.table](XXX)
+1. [R-Rcpp](XXX)
+1. [R-genetics](XXX)
+1. [R-sommer](XXX)
 1. [R-RSpectra-v0.13-1](https://github.com/yixuan/RSpectra)
 1. [R-ggbeeswarm-v0.6](https://github.com/eclarke/ggbeeswarm)
 
