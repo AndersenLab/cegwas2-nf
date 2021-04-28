@@ -13,16 +13,12 @@ nextflow.preview.dsl=2
 */
 date = new Date().format( 'yyyyMMdd' )
 
-params.traitfile = null
-//params.vcf 		 = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.snpeff.vcf.gz"
-params.vcf 		 = "20210121"
 params.p3d 		 = false
-params.sthresh   = "EIGEN"
+params.sthresh   = "BF"
 params.freqUpper = 0.05
 params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
-//params.cendr_v   = "20210121"
 params.e_mem 	 = "10"
 params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
@@ -30,9 +26,31 @@ params.ci_size   = 150
 params.fix_names = "fix"
 params.help 	 = null
 params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
+params.debug       = null
 params.out       = "Analysis_Results-${date}"
 params.annotation = null
 params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.${params.vcf}.${params.annotation}-annotation.tsv"
+
+if(params.debug) {
+	    println """
+
+	        *** Using debug mode ***
+
+	    """
+	    // debug for now with small vcf
+	    params.vcf = "330_TEST.vcf.gz"
+	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
+	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
+      impute_vcf = vcf //use same vcf for finemap and mapping in debug
+      impute_vcf_index = vcf_index
+	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
+	} else { 
+      params.vcf = "20210121"
+      vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
+		  vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
+		  impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz")
+      impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
+   }
 
 println()
 
@@ -130,23 +148,6 @@ log.info ""
 ~ ~ ~ > * WORKFLOW
 */
 workflow {
-
-	// VCF
-	if(params.vcf) {
-		vcf = Channel.fromPath("/projects/b1059/analysis/WI-${params.vcf}/isotype_only/WI.${params.vcf}.hard-filter.isotype.snpeff.vcf.gz") //use snpeff for annotation
-        vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-${params.vcf}/isotype_only/WI.${params.vcf}.hard-filter.isotype.snpeff.vcf.gz.tbi")
-        impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-${params.vcf}/imputed/WI.${params.vcf}.impute.isotype.vcf.gz")
-        impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-${params.vcf}/imputed/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
-
-
-	} else {
-		//vcf = pull_vcf.out.dl_vcf
-		//vcf_index = pull_vcf.out.dl_vcf_index
-		vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
-		vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
-		impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz")
-        impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
-	}
 
 	// Fix strain names
 	Channel.fromPath("${params.traitfile}") | fix_strain_names_bulk

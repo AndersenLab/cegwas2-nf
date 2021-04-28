@@ -86,7 +86,7 @@ user_strain_pheno_list <- processed_mapping %>%
 ```{r echo=FALSE}
 tidy_genes_in_region <- read.delim(paste0("Fine_Mappings/Data/", trait_name, "_snpeff_genes.tsv"), stringsAsFactors=FALSE) %>% 
     dplyr::select(MARKER, POS, REF, ALT, GENE_NAME, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, 
-                  TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE, Phenotype_Value)
+                  TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE)
 
 QTL_peak <- paste0(QTL_Chrom,":",QTL_Peak)
 
@@ -632,7 +632,7 @@ plotly::ggplotly(gene_plot, tooltip = c("plotly_label_gene_name", "plotly_label_
 # All variants in interval
 var_info <- tidy_genes_in_region %>%
     dplyr::filter(QTL_INTERVAL_START == QTL_Region_start & !is.na(WBGeneID)) %>%
-    dplyr::select(MARKER, REF, ALT,WBGeneID, VARIANT_IMPACT, VARIANT_LOG10p:Phenotype_Value) %>%
+    dplyr::select(MARKER, REF, ALT,WBGeneID, VARIANT_IMPACT, VARIANT_LOG10p:STRAIN_GENOTYPE) %>%
     dplyr::distinct() %>%
     mutate(WBGeneID = paste0('<a href=https://wormbase.org/species/c_elegans/gene/', WBGeneID, '>', WBGeneID,'</a>' ) )
 
