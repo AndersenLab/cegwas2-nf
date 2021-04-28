@@ -1,5 +1,11 @@
 #! usr/bin/env nextflow
 
+if( !nextflow.version.matches('20.0+') ) {
+    println "This workflow requires Nextflow version 20.0 or greater -- You are running version $nextflow.version"
+    println "On QUEST, you can use `module load python/anaconda3.6; source activate /projects/b1059/software/conda_envs/nf20_env`"
+    exit 1
+}
+
 nextflow.preview.dsl=2
 
 /*
@@ -7,14 +13,12 @@ nextflow.preview.dsl=2
 */
 date = new Date().format( 'yyyyMMdd' )
 
-//params.traitfile = null
 params.p3d 		 = false
 params.sthresh   = "BF"
 params.freqUpper = 0.05
 params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
-params.cendr_v   = "20210121"
 params.e_mem 	 = "10"
 params.eigen_mem = params.e_mem + " GB"
 params.group_qtl = 1000
@@ -23,10 +27,9 @@ params.fix_names = "fix"
 params.help 	 = null
 params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
 params.debug       = null
-//params.burden    = true
-//params.finemap   = true
-//params.report    = true
 params.out       = "Analysis_Results-${date}"
+params.annotation = null
+params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.${params.vcf}.${params.annotation}-annotation.tsv"
 
 if(params.debug) {
 	    println """
@@ -38,13 +41,16 @@ if(params.debug) {
 	    params.vcf = "330_TEST.vcf.gz"
 	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
 	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
+      impute_vcf = vcf //use same vcf for finemap and mapping in debug
+      impute_vcf_index = vcf_index
 	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
 	} else { 
-		params.vcf = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.snpeff.vcf.gz"
-		vcf = Channel.fromPath("${params.vcf}")
-		vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
-		//impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-${params.vcf}/imputed/WI.${params.vcf}.impute.isotype.vcf.gz")
-	}
+      params.vcf = "20210121"
+      vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
+		  vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
+		  impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz")
+      impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
+   }
 
 println()
 
@@ -183,14 +189,15 @@ workflow {
 			   .splitCsv(sep: '\t')
 			   .join(rrblup_maps.out.processed_map_to_ld)
 			   .join(rrblup_maps.out.pr_maps_trait)
-			   .spread(vcf.spread(vcf_index))
+			   .spread(impute_vcf.spread(impute_vcf_index))
 			   .spread(pheno_strains) | prep_ld_files | rrblup_fine_maps
 		rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
+
 
 		// Plot fine map
 		Channel.fromPath("${params.genes}")
 				.spread(concatenate_LD_per_trait.out)
-				.spread(vcf.spread(vcf_index)) | plot_genes
+				.spread(Channel.fromPath("${params.annvcf}")) | plot_genes
 
 		// Burden mapping
 		if(params.burden) {
@@ -236,6 +243,7 @@ workflow {
 	        exit 1
 		}
 	}
+	
 }
 
 // is this necessary or can i just feed in the location to the vcf on quest?
@@ -719,24 +727,24 @@ process plot_genes {
 	cpus 1
     memory { 32.GB * task.attempt }
     //errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
 
 	tag {phenotype}
 
-	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_gene_plot.pdf"
-	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*snpeff_genes.tsv"
+	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*.pdf"
+	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*genes.tsv"
 
 	input:
-		tuple path(genes), val(TRAIT), path(ld), path(phenotype), path(vcf), path(vcfindex)
+		tuple path(genes), val(TRAIT), path(ld), path(phenotype), path(ann)
 
 	output:
-		tuple val(TRAIT), file("*snpeff_genes.tsv"), file("*pdf"), emit: gene_plts
+		tuple val(TRAIT), file("*genes.tsv"), file("*pdf"), emit: gene_plts
     	val TRAIT, emit: gene_plts_done
 
 	"""
     echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/plot_genes.R > plot_genes.R
     
-    Rscript --vanilla plot_genes.R ${ld} ${phenotype} ${genes} ${vcf} ${params.cendr_v}
+    Rscript --vanilla plot_genes.R ${ld} ${phenotype} ${genes} ${ann} 
 	"""
 }
 
