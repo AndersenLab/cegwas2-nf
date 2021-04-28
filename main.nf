@@ -7,10 +7,9 @@ nextflow.preview.dsl=2
 */
 date = new Date().format( 'yyyyMMdd' )
 
-params.traitfile = null
-params.vcf 		 = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.snpeff.vcf.gz"
+//params.traitfile = null
 params.p3d 		 = false
-params.sthresh   = "EIGEN"
+params.sthresh   = "BF"
 params.freqUpper = 0.05
 params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
@@ -23,10 +22,29 @@ params.ci_size   = 150
 params.fix_names = "fix"
 params.help 	 = null
 params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
+params.debug       = null
 //params.burden    = true
 //params.finemap   = true
 //params.report    = true
 params.out       = "Analysis_Results-${date}"
+
+if(params.debug) {
+	    println """
+
+	        *** Using debug mode ***
+
+	    """
+	    // debug for now with small vcf
+	    params.vcf = "330_TEST.vcf.gz"
+	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
+	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
+	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
+	} else { 
+		params.vcf = "/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.snpeff.vcf.gz"
+		vcf = Channel.fromPath("${params.vcf}")
+		vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
+		//impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-${params.vcf}/imputed/WI.${params.vcf}.impute.isotype.vcf.gz")
+	}
 
 println()
 
@@ -124,18 +142,6 @@ log.info ""
 ~ ~ ~ > * WORKFLOW
 */
 workflow {
-
-	// VCF
-	if(params.vcf) {
-		vcf = Channel.fromPath("${params.vcf}")
-		vcf_index = Channel.fromPath("${params.vcf}" + ".tbi")
-
-	} else {
-		//vcf = pull_vcf.out.dl_vcf
-		//vcf_index = pull_vcf.out.dl_vcf_index
-		vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
-		vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
-	}
 
 	// Fix strain names
 	Channel.fromPath("${params.traitfile}") | fix_strain_names_bulk

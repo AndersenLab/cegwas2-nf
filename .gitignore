@@ -1,3 +1,5 @@
+ANALYSIS/*
+nohup*
 Brown_Subset
 *.nextflow.log*
 *.nextflow
