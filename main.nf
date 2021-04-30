@@ -55,9 +55,17 @@ if(params.debug) {
 	      	impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
 	      	// right now this is the only one we have...
 			params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20210121.${params.annotation}-annotation.tsv"
-			if(params.vcf != "20210121") {
-				println("WARNING. VCF annotations from the 20210121 will be used.")
+			
+			// no bcsq annotation for 20200815 or earlier vcf. Will anyone ever use earlier?
+			if("${params.vcf}" == "20200815") {
+				println("WARNING. Only Snpeff annotation is available for this vcf. If you want bcsq annotation, use 20210121.")
+				params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20200815.snpeff-annotation.tsv"
+			} else if("${params.vcf}" != "20210121") {
+				println("ERROR. Please choose either 20200815 or 20210121 for the --vcf parameter")
+				exit 1
 			}
+			
+
 		} else {
 			params.vcf = "20210121"
 			pull_vcf()
@@ -999,9 +1007,9 @@ workflow.onComplete {
     ---------------------------
 	Phenotype File                          = ${params.traitfile}
 	VCF                                     = ${params.vcf}
-	CeNDR Release                           = ${params.cendr_v}
 	Gene File                               = ${params.genes}
 	Annotation File                         = ${params.refflat}
+	Annotation vcf                          = ${params.annvcf}
 
 	Significance Threshold                  = ${params.sthresh}
 	P3D                                     = ${params.p3d}
