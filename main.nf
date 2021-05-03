@@ -102,7 +102,7 @@ if (params.help) {
     log.info "REQUIRES NEXTFLOW VERSION 20.0+"
     log.info ">> module load python/anaconda3.6"
     log.info ">> source activate /projects/b1059/software/conda_envs/nf20_env"
-    log.info "nextflow main.nf --traitfile=test_bulk --p3d=TRUE --sthresh=EIGEN # run all traits from a single file"
+    log.info "nextflow main.nf --traitfile=test_bulk --vcf 20210121 --annotation bcsq"
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--traitfile              String                Name of file that contains phenotypes. File should be tab-delimited with the columns: strain trait1 trait2 ..."

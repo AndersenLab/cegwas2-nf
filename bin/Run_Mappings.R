@@ -237,7 +237,7 @@ process_mapping_df <- function (mapping_df,
     
     cors <- gINFO %>% dplyr::group_by(trait, marker) %>% 
       dplyr::mutate(var.exp = cor(value, allele, use = "pairwise.complete.obs", 
-                                  method = "spearman")^2)
+                                  method = "pearson")^2)
     
     CORmaps <- Processed %>% 
       dplyr::left_join(., cors, by = c("trait", "marker", "CHROM", "POS"), copy = TRUE)
