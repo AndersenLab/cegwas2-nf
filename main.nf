@@ -49,16 +49,20 @@ if(params.debug) {
 	} else { 
 		if(params.quest) {
 			params.vcf = "20210121"
-	      	vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz")
-			vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/isotype_only/WI.20210121.hard-filter.isotype.vcf.gz.tbi")
-			impute_vcf = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz")
-	      	impute_vcf_index = Channel.fromPath("/projects/b1059/analysis/WI-20210121/imputed/WI.20210121.impute.isotype.vcf.gz.tbi")
+	      	vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
+			vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
+			impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
+	      	impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
 	      	// right now this is the only one we have...
-			params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20210121.${params.annotation}-annotation.tsv"
+			params.annvcf = "/projects/b1059/projects/Katie/annotation/WI.${params.vcf}.${params.annotation}-annotation.tsv"
 			
 			// no bcsq annotation for 20200815 or earlier vcf. Will anyone ever use earlier?
 			if("${params.vcf}" == "20200815") {
 				println("WARNING. Only Snpeff annotation is available for this vcf. If you want bcsq annotation, use 20210121.")
+				vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
+				vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
+				impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
+	      		impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
 				params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20200815.snpeff-annotation.tsv"
 			} else if("${params.vcf}" != "20210121") {
 				println("ERROR. Please choose either 20200815 or 20210121 for the --vcf parameter")

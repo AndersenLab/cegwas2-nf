@@ -334,7 +334,9 @@ ComplexHeatmap::decorate_heatmap_body("div_region", {
 haplotype_in_QTL_region <- read.delim("Divergent_and_haplotype/haplotype_in_QTL_region.txt", header=FALSE, stringsAsFactors=FALSE) %>% 
     dplyr::select(-V13)
 
-names(haplotype_in_QTL_region) <- c("chromosome", "start", "stop", "haplotype", "isotype", "plotpoint", "segment", "color", "color_new", "Chrom", "Region_start", "Region_end")
+# names(haplotype_in_QTL_region) <- c("chromosome", "start", "stop", "haplotype", "isotype", "plotpoint", "segment", "color", "color_new", "Chrom", "Region_start", "Region_end")
+
+names(haplotype_in_QTL_region) <- c("chromosome", "start", "stop", "haplotype", "isotype", "plotpoint", "segment", "color", "Chrom", "Region_start", "Region_end")
 
 
 ########### filter only tested strains
@@ -344,7 +346,7 @@ names(haplotype_in_QTL_region) <- c("chromosome", "start", "stop", "haplotype", 
 
 plot_df <- haplotype_in_QTL_region %>%
     dplyr::filter(Chrom == QTL_Chrom & Region_start == QTL_Region_start) %>% 
-    dplyr::select(chromosome, start, stop, haplotype, isotype, plotpoint, segment, color, color_new)
+    dplyr::select(chromosome, start, stop, haplotype, isotype, plotpoint, segment, color)
 
 
 ########### sort by haplotype of 1st and last segment
@@ -392,10 +394,10 @@ mcolor_grp <- plot_df %>%
     dplyr::distinct()
 mcolor <- mcolor_grp$color
 
-mcolor_grp2 <- plot_df %>% 
-    dplyr::select(haplotype, color_new) %>% 
-    dplyr::distinct()
-mcolor2 <- mcolor_grp2$color_new
+# mcolor_grp2 <- plot_df %>% 
+#     dplyr::select(haplotype, color_new) %>% 
+#     dplyr::distinct()
+# mcolor2 <- mcolor_grp2$color_new
 
 names(mcolor) <- mcolor_grp$haplotype
 
@@ -426,22 +428,22 @@ p1 <- ggplot2::ggplot(filter(plot_df),
 #ggsave(paste0("haplotype_", QTL_Chrom, ".", QTL_Region_start, ".", QTL_Region_end, ".png"), p, height = 30, width = 8)
 
 
-p2 <- ggplot2::ggplot(filter(plot_df),
-             ggplot2::aes(x = start, xend = stop,
-                 y = isotype, yend = isotype,
-                 color = haplotype)) +
-    ggplot2::geom_segment(size = 3) +
-    ggplot2::scale_color_manual(values = mcolor2) +
-    ggplot2::xlab("Position") +
-    ggplot2::theme_bw() +
-    ggplot2::coord_cartesian(xlim=c(QTL_Region_start, QTL_Region_end)) +
-    ggplot2::theme(legend.position="none") +
-    ggplot2::geom_vline(xintercept = QTL_Peak) +
-    ggplot2::facet_grid(geno_group ~ ., scales = "free", space = "free") + 
-    ggplot2::theme(panel.spacing = unit(1, "lines"))
+# p2 <- ggplot2::ggplot(filter(plot_df),
+#              ggplot2::aes(x = start, xend = stop,
+#                  y = isotype, yend = isotype,
+#                  color = haplotype)) +
+#     ggplot2::geom_segment(size = 3) +
+#     ggplot2::scale_color_manual(values = mcolor2) +
+#     ggplot2::xlab("Position") +
+#     ggplot2::theme_bw() +
+#     ggplot2::coord_cartesian(xlim=c(QTL_Region_start, QTL_Region_end)) +
+#     ggplot2::theme(legend.position="none") +
+#     ggplot2::geom_vline(xintercept = QTL_Peak) +
+#     ggplot2::facet_grid(geno_group ~ ., scales = "free", space = "free") + 
+#     ggplot2::theme(panel.spacing = unit(1, "lines"))
 
-
-cowplot::plot_grid(p1, p2, ncol=2)
+print(p1)
+# cowplot::plot_grid(p1, p2, ncol=2)
 
 # ggplotly(p1) # cannot get the grid panel size to maintain the scale. to be fixed.
 ```
