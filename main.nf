@@ -31,63 +31,6 @@ params.out       = "Analysis_Results-${date}"
 // add a param for local instead of quest
 params.quest    = true
 
-if(params.debug) {
-	    println """
-
-	        *** Using debug mode ***
-
-	    """
-	    // debug for now with small vcf
-	    params.vcf = "330_TEST.vcf.gz"
-	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
-	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
-      	impute_vcf = vcf //use same vcf for finemap and mapping in debug
-      	impute_vcf_index = vcf_index
-	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
-	    params.annotation = "snpeff"
-	    params.annvcf = "${workflow.projectDir}/bin/WI.20210121.snpeff-annotation.tsv"
-	} else { 
-		if(params.quest) {
-			params.vcf = "20210121"
-	      	vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
-			vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
-			impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
-	      	impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
-	      	// right now this is the only one we have...
-			params.annvcf = "/projects/b1059/projects/Katie/annotation/WI.${params.vcf}.${params.annotation}-annotation.tsv"
-			
-			// no bcsq annotation for 20200815 or earlier vcf. Will anyone ever use earlier?
-			if("${params.vcf}" == "20200815") {
-				println("WARNING. Only Snpeff annotation is available for this vcf. If you want bcsq annotation, use 20210121.")
-				vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
-				vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
-				impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
-	      		impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
-				params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20200815.snpeff-annotation.tsv"
-			} else if("${params.vcf}" != "20210121") {
-				println("ERROR. Please choose either 20200815 or 20210121 for the --vcf parameter")
-				exit 1
-			}
-			
-
-		} else {
-			params.vcf = "20210121"
-			pull_vcf()
-
-	      	vcf = pull_vcf.out.hard_vcf
-			vcf_index = pull_vcf.out.hard_vcf_index
-			impute_vcf = pull_vcf.out.impute_vcf
-	      	impute_vcf_index = pull_vcf.out.impute_vcf_index
-	      	println("WARNING. Pulling vcf from CeNDR -- No annotation will be used.")
-	      	// need annotattion for outside of quest
-	      	// right now this is the only one we have...
-			//params.annvcf    = "/projects/b1059/projects/Katie/annotation/WI.20210121.${params.annotation}-annotation.tsv"
-		}
-
-   }
-
-
-
 
 println()
 
@@ -184,6 +127,59 @@ log.info ""
 ~ ~ ~ > * WORKFLOW
 */
 workflow {
+
+
+if(params.debug) {
+	    println """
+
+	        *** Using debug mode ***
+
+	    """
+	    // debug for now with small vcf
+	    params.vcf = "330_TEST.vcf.gz"
+	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
+	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
+      	impute_vcf = vcf //use same vcf for finemap and mapping in debug
+      	impute_vcf_index = vcf_index
+	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
+	    params.annotation = "snpeff"
+	    params.annvcf = "${workflow.projectDir}/bin/WI.20210121.snpeff-annotation.tsv"
+	} else { 
+		if(params.quest) {
+			params.vcf = "20210121"
+	      	vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
+			vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
+			impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
+	      	impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
+	      	// right now this is the only one we have...
+			params.annvcf = "/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv"
+			
+			// no bcsq annotation for 20200815 or earlier vcf. Will anyone ever use earlier?
+			if("${params.vcf}" == "20200815") {
+				println("WARNING. Only Snpeff annotation is available for this vcf. If you want bcsq annotation, use 20210121.")
+				vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
+				vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
+				impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
+	      		impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
+				params.annvcf    = "/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv"
+			} else if("${params.vcf}" != "20210121") {
+				println("ERROR. Please choose either 20200815 or 20210121 for the --vcf parameter")
+				exit 1
+			}
+			
+
+		} else {
+			params.vcf = "20210121"
+			pull_vcf()
+
+	      	vcf = pull_vcf.out.hard_vcf
+			vcf_index = pull_vcf.out.hard_vcf_index
+			impute_vcf = pull_vcf.out.impute_vcf
+	      	impute_vcf_index = pull_vcf.out.impute_vcf_index
+	      	params.annvcf = pull_vcf.out.ann_vcf
+		}
+
+   }
 
 	// Fix strain names
 	Channel.fromPath("${params.traitfile}") | fix_strain_names_bulk
@@ -295,7 +291,8 @@ process pull_vcf {
 		path "*hard-filter.isotype.vcf.gz", emit: hard_vcf 
 		path "*hard-filter.isotype.vcf.gz.tbi", emit: hard_vcf_index 
 		path "*impute.isotype.vcf.gz", emit: impute_vcf 
-		path "*impute.isotype.vcf.gz.tbi", emit: impute_index 
+		path "*impute.isotype.vcf.gz.tbi", emit: impute_vcf_index 
+		path "*.strain-annotation*.tsv", emit: ann_vcf
 
 	"""
 		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.hard-filter.isotype.vcf.gz
@@ -303,6 +300,8 @@ process pull_vcf {
 
 		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.impute.isotype.vcf.gz
 		tabix -p vcf WI.${params.vcf}.impute.isotype.vcf.gz
+
+		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv
 
 	"""
 }

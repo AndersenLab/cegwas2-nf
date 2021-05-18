@@ -69,7 +69,7 @@ for(r in 1:nrow(query_regions)){
 # combine annotations for regions
 annotation_df <- dplyr::bind_rows(annotation_out) %>%
     dplyr::left_join(pr_trait_ld, ., by = c("marker", "REF", "ALT")) %>% {
-        if(ann_type == "bcsq") dplyr::rename(., gene_id = GENE) else .
+        if(ann_type == "bcsq") dplyr::rename(., gene_id = WORMBASE_ID) else .
     }
 
 genes_in_region <- gene_ref_flat %>%
@@ -88,14 +88,14 @@ tidy_genes_in_region <- ugly_genes_in_region %>% {
     if(ann_type == "bcsq") {
         # no gene_name, feature_type
         dplyr::select(., MARKER = marker, CHROM, POS, REF, ALT, MAF_variant = maf_marker_b,
-                      WBGeneID = gene_id,
+                      WBGeneID = gene_id, GENE,
                       WBFeature_ID = feature_id, TRANSCRIPT_BIOTYPE = BIOTYPE, CONSEQUENCE, VARIANT_IMPACT,
                       NUCLEOTIDE_CHANGE = DNA_CHANGE, AMINO_ACID_CHANGE, BLOSUM, Grantham, Percent_Protein,
                       STRAND, TRANSCRIPTION_START_POS = txstart, TRANSCRIPTION_END_POS = txend,
                       PEAK_MARKER = peak_marker, PEAK_MAF = peak_maf, TRAIT = trait,
                       QTL_INTERVAL_START = start_pos, QTL_INTERVAL_END = end_pos,
                       VARIANT_LD_WITH_PEAK_MARKER = ld_r2, VARIANT_LOG10p = log10p,
-                      STRAIN = strain, STRAIN_GENOTYPE = allele)
+                      STRAIN = strain, STRAIN_GENOTYPE = allele, DIVERGENT)
     } else {
         dplyr::select(., MARKER = marker, CHROM, POS, REF, ALT, MAF_variant = maf_marker_b,
                       GENE_NAME = gene_name, WBGeneID = gene_id, WBFeature_TYPE = feature_type,
