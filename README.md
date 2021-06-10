@@ -68,7 +68,7 @@ Users can select from a number of profiles that each run different processes for
 
 * `-profile standard` - This is the default profile if no profile is included. This profile runs the GWA mapping, fine mapping, burden mapping, and generates plots and dataframes in the output folder.
 
-* `-profile manplot_only` - This profile only runs the GWA mapping and generates manhattan and phenotype-by-genotype plots for each trait. No fine mapping or burden mapping is performed. This profile is good for users with hundreds of traits.
+* `-profile manplot` - This profile only runs the GWA mapping and generates manhattan and phenotype-by-genotype plots for each trait. No fine mapping or burden mapping is performed. This profile is good for users with hundreds of traits.
 
 * `-profile reports` - This profile runs all the same processes as the standard profile with an additional analysis for haplotypes and divergent regions in the QTL. In addition to the standard outputs, this profile also outputs an html markdown report for each trait with the markdown file that can be run independently on a local computer to reproduce the output files and figures. This profile works best with <30 traits.
 
