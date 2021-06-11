@@ -209,12 +209,13 @@ process_mapping_df <- function (mapping_df,
     dplyr::select(marker, trait)
   
   snpsForVE$trait <- as.character(snpsForVE$trait)
-  
+
   if (nrow(snpsForVE) > 0) {
     
     row.names(pheno) <- gsub("-", "\\.", row.names(pheno))
     
-    pheno$trait <- gsub("-", "\\.", pheno$trait)
+    # do we need this? it causes an error if trait contains "-"
+    # pheno$trait <- gsub("-", "\\.", pheno$trait)
     
     rawTr <- pheno %>%
       dplyr::left_join(., snpsForVE, by = "trait")
