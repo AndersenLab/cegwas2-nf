@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 library(tidyverse)
+library(R.utils)
 # library(cegwas2)
 
 # input arguments

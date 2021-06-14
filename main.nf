@@ -142,10 +142,17 @@ if(params.debug) {
       	impute_vcf = vcf //use same vcf for finemap and mapping in debug
       	impute_vcf_index = vcf_index
 	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
-	    params.annotation = "snpeff"
-	    params.annvcf = "${workflow.projectDir}/bin/WI.20210121.snpeff-annotation.tsv"
+	    params.annotation = "bcsq"
+	    params.annvcf = "${workflow.projectDir}/bin/WI.330_TEST.strain-annotation.bcsq.tsv"
 	} else { 
 		if(params.quest) {
+
+			// check for annotation
+			if(!params.annotation) {
+				println("ERROR. Please choose --annotation (snpeff or bcsq)")
+				exit 1
+			}
+
 			params.vcf = "20210121"
 	      	vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
 			vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")

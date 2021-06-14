@@ -209,11 +209,13 @@ process_mapping_df <- function (mapping_df,
     dplyr::select(marker, trait)
   
   snpsForVE$trait <- as.character(snpsForVE$trait)
+  snpsForVE$trait <- gsub("-", "\\.", snpsForVE$trait)
   
   if (nrow(snpsForVE) > 0) {
     
     row.names(pheno) <- gsub("-", "\\.", row.names(pheno))
     
+    # do we need this? why?
     pheno$trait <- gsub("-", "\\.", pheno$trait)
     
     rawTr <- pheno %>%
@@ -285,8 +287,7 @@ process_mapping_df <- function (mapping_df,
           }
         }
         intervals[[i]] <- findPks %>% dplyr::ungroup()
-      }
-      else {
+      } else {
         findPks$pID <- 1
         for (j in 2:nrow(findPks)) {
           findPks$pID[j] <- ifelse(abs(findPks$index[j] - findPks$index[j - 1]) < snp_grouping & findPks$CHROM[j] == findPks$CHROM[j - 1],
