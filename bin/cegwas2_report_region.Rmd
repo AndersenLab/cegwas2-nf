@@ -84,8 +84,11 @@ user_strain_pheno_list <- processed_mapping %>%
 
 ## Phenotype x Genotype plot:
 ```{r echo=FALSE}
-tidy_genes_in_region <- read.delim(paste0("Fine_Mappings/Data/", trait_name, "_snpeff_genes.tsv"), stringsAsFactors=FALSE) %>% 
-    dplyr::select(MARKER, POS, REF, ALT, GENE_NAME, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, 
+# allow for bcsq or snpeff
+file <- grep("genes.tsv", grep(glue::glue("{trait_name}"), list.files("~/Downloads"), value = T), value = T)
+
+tidy_genes_in_region <- read.delim(paste0("~/Downloads/", file), stringsAsFactors=FALSE) %>% 
+    dplyr::select(MARKER, POS, REF, ALT, GENE_NAME = GENE, WBGeneID, VARIANT_IMPACT, PEAK_MARKER, CHROM, STRAND, TRANSCRIPTION_START_POS, 
                   TRANSCRIPTION_END_POS, QTL_INTERVAL_START, QTL_INTERVAL_END, VARIANT_LOG10p, STRAIN, STRAIN_GENOTYPE)
 
 QTL_peak <- paste0(QTL_Chrom,":",QTL_Peak)

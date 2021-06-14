@@ -58,7 +58,7 @@ if (params.help) {
     log.info "----------------------------------------------------------------"
    	log.info "Optional arguments (General):"
    	log.info "--out                    String                Name of folder that will contain the results"
-   	log.info "--vcf                    String                Name of VCF to extract variants from. There should also be a tabix-generated index file with the same name in the directory that contains the VCF. If none is provided, the pipeline will download the latest VCF from CeNDR"
+   	log.info "--vcf                    String                Cendr release date of vcf to use for analysis (i.e. 20210121)"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
     log.info "--e_mem                  String                Value that corresponds to the amount of memory to allocate for eigen decomposition of chromosomes (DEFAULT = 100)"
     log.info "--burden                 BOOLEAN               Whether or not to perform burden mapping (DEFAULT = TRUE). NOTE: HTML report will not be generated if burden is set to FALSE."
@@ -144,6 +144,7 @@ if(params.debug) {
 	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
 	    params.annotation = "bcsq"
 	    params.annvcf = "${workflow.projectDir}/bin/WI.330_TEST.strain-annotation.bcsq.tsv"
+
 	} else { 
 		if(params.quest) {
 

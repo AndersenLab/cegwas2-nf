@@ -70,14 +70,14 @@ for(r in 1:nrow(query_regions)){
 # combine annotations for regions
 annotation_df <- dplyr::bind_rows(annotation_out) %>%
     dplyr::left_join(pr_trait_ld, ., by = c("marker", "REF", "ALT")) %>% {
-        if(ann_type == "bcsq") dplyr::rename(., gene_id = WORMBASE_ID) else .
+        if(ann_type == "bcsq") dplyr::rename(., gene_id = WORMBASE_ID) else dplyr::select(., -gene_name, -feature_id)
     }
 
 genes_in_region <- gene_ref_flat %>%
     dplyr::filter(wbgene %in% annotation_df$gene_id) %>%
     dplyr::select(gene_id = wbgene, strand, txstart, txend, feature_id = gene) %>%
     dplyr::arrange(txstart, feature_id)%>%
-    dplyr::distinct(gene_id, feature_id, .keep_all = TRUE)
+    dplyr::distinct(gene_id, feature_id, .keep_all = TRUE) 
 
 ugly_genes_in_region <- genes_in_region %>%
     dplyr::left_join(annotation_df, ., by = "gene_id") %>%
@@ -100,7 +100,7 @@ tidy_genes_in_region <- ugly_genes_in_region %>% {
     } else {
         dplyr::select(., MARKER = marker, CHROM, POS, REF, ALT, MAF_variant = maf_marker_b,
                       GENE_NAME = gene_name, WBGeneID = gene_id, WBFeature_TYPE = feature_type,
-                      WBFeature_ID = feature_id.x, VARIANT_IMPACT,
+                      WBFeature_ID = feature_id, VARIANT_IMPACT,
                       NUCLEOTIDE_CHANGE = DNA_CHANGE, AMINO_ACID_CHANGE,
                       STRAND = strand, TRANSCRIPTION_START_POS = txstart, TRANSCRIPTION_END_POS = txend,
                       PEAK_MARKER = peak_marker, PEAK_MAF = peak_maf, TRAIT = trait,
