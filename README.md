@@ -68,7 +68,7 @@ Users can select from a number of profiles that each run different processes for
 
 * `-profile standard` - This is the default profile if no profile is included. This profile runs the GWA mapping, fine mapping, burden mapping, and generates plots and dataframes in the output folder.
 
-* `-profile manplot_only` - This profile only runs the GWA mapping and generates manhattan and phenotype-by-genotype plots for each trait. No fine mapping or burden mapping is performed. This profile is good for users with hundreds of traits.
+* `-profile manplot` - This profile only runs the GWA mapping and generates manhattan and phenotype-by-genotype plots for each trait. No fine mapping or burden mapping is performed. This profile is good for users with hundreds of traits.
 
 * `-profile reports` - This profile runs all the same processes as the standard profile with an additional analysis for haplotypes and divergent regions in the QTL. In addition to the standard outputs, this profile also outputs an html markdown report for each trait with the markdown file that can be run independently on a local computer to reproduce the output files and figures. This profile works best with <30 traits.
 
@@ -89,7 +89,7 @@ Users can select from a number of profiles that each run different processes for
 
 
 #### Optional parameters
-* `--vcf` - is a VCF file with variant data. All strains with phenotypes should be represented in the VCF used for mapping. There should also abe a tabix-generated index file (.tbi) in the same folder as the specified VCF file that has the same name as the VCF except for the addition of the `.tbi` extension. (generated using `tabix -p vcf vcfname.vcf.gz`). Hard-filtered vcf is preferred. The default is the current *C. elegans* release from [CeNDR](https://elegansvariation.org/data/release/latest)
+* `--vcf` - CeNDR release date for the VCF file with variant data. Default is "20210121". Hard-filter VCF will be used for the GWA mapping and imputed VCF will be used for fine mapping.
 
 * `--sthresh` - This determines the signficance threshold required for performing post-mapping analysis of a QTL. `BF` corresponds to Bonferroni correction (DEFAULT), `EIGEN` corresponds to correcting for the number of independent markers in your data set, and `user-specified` corresponds to a user-defined threshold, where you replace user-specified with a number. For example `--sthresh=4` will set the threshold to a `-log10(p)` value of 4. We recommend using the strict `BF` correction as a first pass to see what the resulting data looks like. If the pipeline stops at the `summarize_maps` process, no significant QTL were discovered with the input threshold. You might want to consider lowering the threshold if this occurs. 
 
