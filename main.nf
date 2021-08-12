@@ -120,6 +120,8 @@ log.info "Burden mapping                          = ${params.burden}"
 log.info "Fine mapping                            = ${params.finemap}"
 log.info "HTML report generation                  = ${params.report}"
 log.info "Result Directory                        = ${params.out}"
+log.info "------------------------------------------------------------"
+log.info "Git info: $workflow.repository - $workflow.revision [$workflow.commitId]"
 log.info ""
 }
 
