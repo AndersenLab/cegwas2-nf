@@ -1,36 +1,25 @@
 #! usr/bin/env nextflow
 
-if( !nextflow.version.matches('20.0+') ) {
-    println "This workflow requires Nextflow version 20.0 or greater -- You are running version $nextflow.version"
-    println "On QUEST, you can use `module load python/anaconda3.6; source activate /projects/b1059/software/conda_envs/nf20_env`"
-    exit 1
+if( !nextflow.version.matches('23.0+') ) {
+    println "This workflow requires Nextflow version 23.0 or greater -- You are running version $nextflow.version"
+    if (${params.platform == "local") {
+		println "On your local platform, you can use conda to create a conda environment with 'nextflow>=23.0'. Then activate this environment to run the worklflow. You will also need docker running."
+	} else {
+		println "On ${params.platform}, you can use `module load python/${params.anaconda}; source activate ${params.softwareDir}/conda_envs/nf20_env`"
+	}
+	exit 1
 }
 
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 /*
 ~ ~ ~ > * USER INPUT PARAMETERS 
 */
 date = new Date().format( 'yyyyMMdd' )
 
-params.p3d 		 = false
-params.sthresh   = "BF"
-params.freqUpper = 0.05
-params.minburden = 2
 params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
-params.e_mem 	 = "10"
-params.eigen_mem = params.e_mem + " GB"
-params.group_qtl = 1000
-params.ci_size   = 150
-params.fix_names = "fix"
-params.help 	 = null
-params.R_libpath = "/projects/b1059/software/R_lib_3.6.0"
-params.debug       = null
-params.out       = "Analysis_Results-${date}"
-// add a param for local instead of quest
-params.quest    = true
-
+params.R_libpath = "${params.softwareDir}/R_lib_3.6.0"
 
 println()
 
@@ -46,9 +35,9 @@ if (params.help) {
     log.info "                      USAGE                                     "
     log.info "----------------------------------------------------------------"
     log.info ""
-    log.info "REQUIRES NEXTFLOW VERSION 20.0+"
-    log.info ">> module load python/anaconda3.6"
-    log.info ">> source activate /projects/b1059/software/conda_envs/nf20_env"
+    log.info "REQUIRES NEXTFLOW VERSION 23.0+"
+    log.info ">> module load python/${params.anaconda}"
+    log.info ">> source activate ${params.softwareDir/}conda_envs/nf23_env"
     log.info "nextflow main.nf --traitfile=test_bulk --vcf 20210121 --annotation bcsq"
     log.info ""
     log.info "Mandatory arguments:"
@@ -72,7 +61,7 @@ if (params.help) {
     log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
     log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
-    log.info "--R_libpath              String                Path to the required R libraries (DEFAULT = /projects/b1059/software/R_lib_3.4.1)"
+    log.info "--R_libpath              String                Path to the required R libraries (DEFAULT = ${params/softareDir}/R_lib_3.6.0)"
     log.info ""
     log.info "--------------------------------------------------------"
     log.info "Information describing the stucture of the input files can be located in input_files/README.txt"
@@ -148,7 +137,11 @@ if(params.debug) {
 	    params.annvcf = "${workflow.projectDir}/bin/WI.330_TEST.strain-annotation.bcsq.tsv"
 
 	} else { 
-		if(params.quest) {
+		if("${params.vcf}" != "20210121" & ${params.vcf} != "20220216" & ${params.vcf} != "20231213") {
+			println("ERROR. Please choose either 20210121, 20220216, or 20231213 for the --vcf parameter")
+			exit 1
+		}
+		if(params.platform != "local") {
 
 			// check for annotation
 			if(!params.annotation) {
@@ -156,30 +149,13 @@ if(params.debug) {
 				exit 1
 			}
 
-			params.vcf = "20210121"
-	      	vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
-			vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
-			impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
-	      	impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
+	      	vcf = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
+			vcf_index = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
+			impute_vcf = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
+	      	impute_vcf_index = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
 	      	// right now this is the only one we have...
-			params.annvcf = "/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv"
-			
-			// no bcsq annotation for 20200815 or earlier vcf. Will anyone ever use earlier?
-			if("${params.vcf}" == "20200815") {
-				println("WARNING. Only Snpeff annotation is available for this vcf. If you want bcsq annotation, use 20210121.")
-				vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
-				vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
-				impute_vcf = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
-	      		impute_vcf_index = Channel.fromPath("/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
-				params.annvcf    = "/projects/b1059/data/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv"
-			} else if("${params.vcf}" != "20210121") {
-				println("ERROR. Please choose either 20200815 or 20210121 for the --vcf parameter")
-				exit 1
-			}
-			
-
+			params.annvcf = "${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv"
 		} else {
-			params.vcf = "20210121"
 			pull_vcf()
 
 	      	vcf = pull_vcf.out.hard_vcf
@@ -221,7 +197,7 @@ if(params.debug) {
 	rrblup_maps.out.processed_map_to_summary_plot.collect() | summarize_maps
 
 	// only continue if manplot_only = false
-	if(params.finemap) {
+	if(${params.finemap} & ${params.manplot} == False) {
 		// LD
 		rrblup_maps.out.pr_maps_trait
 				.combine(vcf_to_geno_matrix.out) | LD_between_regions
@@ -235,24 +211,21 @@ if(params.debug) {
 			   .spread(pheno_strains) | prep_ld_files | rrblup_fine_maps
 		rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
 
-
 		// Plot fine map\
-		if(params.quest) {
-			Channel.fromPath("${params.genes}")
-				.spread(concatenate_LD_per_trait.out)
-				.spread(Channel.fromPath("${params.annvcf}")) | plot_genes
-		}
+		Channel.fromPath("${params.genes}")
+			.spread(concatenate_LD_per_trait.out)
+			.spread(Channel.fromPath("${params.annvcf}")) | plot_genes
 
 
 		// Burden mapping
-		if(params.burden) {
+		if(${params.burden}) {
 			traits_to_map
 				.spread(vcf.spread(vcf_index))
 				.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
 
 
 			// generate html report -- change this to accomate no burden too?
-			if(params.report) {
+			if(${params.report}) {
 
 				plot_burden.out
 					.join(LD_between_regions.out.linkage_done)
@@ -265,7 +238,7 @@ if(params.debug) {
 			    	.combine(html_region_prep_table.out.html_region_prep_table_done) | html_report_region
 
 			}
-		} else if(params.report) {
+		} else if(${params.report}) {
 			println """
 
 	        ERROR: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
@@ -296,6 +269,7 @@ process pull_vcf {
 
 	tag {"PULLING VCF FROM CeNDR"}
 	executor 'local'
+	container null
 
 	output:
 		path "*hard-filter.isotype.vcf.gz", emit: hard_vcf 
@@ -305,22 +279,23 @@ process pull_vcf {
 		path "*.strain-annotation*.tsv", emit: ann_vcf
 
 	"""
-		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.hard-filter.isotype.vcf.gz
-		tabix -p vcf WI.${params.vcf}.hard-filter.isotype.vcf.gz
+	wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.hard-filter.isotype.vcf.gz
+	tabix -p vcf WI.${params.vcf}.hard-filter.isotype.vcf.gz
 
-		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.impute.isotype.vcf.gz
-		tabix -p vcf WI.${params.vcf}.impute.isotype.vcf.gz
+	wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.impute.isotype.vcf.gz
+	tabix -p vcf WI.${params.vcf}.impute.isotype.vcf.gz
 
-		wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv
+	wget https://storage.googleapis.com/elegansvariation.org/releases/${params.vcf}/variation/WI.${params.vcf}.strain-annotation.${params.annotation}.tsv
 
 	"""
 }
 
 process fix_strain_names_bulk {
 
-	executor 'local'
-
 	tag {"BULK TRAIT"}
+
+	label "R"
+	label "sm"
 
 	publishDir "${params.out}/Phenotypes", mode: 'copy', pattern: "*pr_*.tsv"
 	publishDir "${params.out}/Phenotypes", mode: 'copy', pattern: "strain_issues.txt"
@@ -334,10 +309,10 @@ process fix_strain_names_bulk {
 		file("strain_issues.txt")
 
 	"""
-		# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
-		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
+	# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
+	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
 
-		Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names} ${workflow.projectDir}/bin/strain_isotype_lookup.tsv
+	Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names} ${workflow.projectDir}/bin/strain_isotype_lookup.tsv
 	"""
 
 }
@@ -346,11 +321,10 @@ process fix_strain_names_bulk {
 
 process vcf_to_geno_matrix {
 
-	executor 'local'
-
 	publishDir "${params.out}/Genotype_Matrix", mode: 'copy'
 
-	cpus 1
+	label "plink"
+	label "sm"
 
 	input:
 		tuple file(vcf), file(index), file(strains)
@@ -359,45 +333,43 @@ process vcf_to_geno_matrix {
 		file("Genotype_Matrix.tsv") 
 
 	"""
+	bcftools view -S ${strains} ${vcf} |\\
+	bcftools filter -i N_MISSING=0 -Oz -o Phenotyped_Strain_VCF.vcf.gz
 
-		bcftools view -S ${strains} ${vcf} |\\
-		bcftools filter -i N_MISSING=0 -Oz -o Phenotyped_Strain_VCF.vcf.gz
+	tabix -p vcf Phenotyped_Strain_VCF.vcf.gz
 
-		tabix -p vcf Phenotyped_Strain_VCF.vcf.gz
+	plink --vcf Phenotyped_Strain_VCF.vcf.gz \\
+		--snps-only \\
+		--biallelic-only \\
+		--maf 0.05 \\
+		--set-missing-var-ids @:# \\
+		--indep-pairwise 50 10 0.8 \\
+		--geno \\
+		--allow-extra-chr
 
-		plink --vcf Phenotyped_Strain_VCF.vcf.gz \\
-			--snps-only \\
-			--biallelic-only \\
-			--maf 0.05 \\
-			--set-missing-var-ids @:# \\
-			--indep-pairwise 50 10 0.8 \\
-			--geno \\
-			--allow-extra-chr
+	awk -F":" '\$1=\$1' OFS="\\t" plink.prune.in | \\
+	sort -k1,1d -k2,2n > markers.txt
 
-		awk -F":" '\$1=\$1' OFS="\\t" plink.prune.in | \\
-		sort -k1,1d -k2,2n > markers.txt
+	bcftools query -l Phenotyped_Strain_VCF.vcf.gz |\\
+	sort > sorted_samples.txt 
 
-		bcftools query -l Phenotyped_Strain_VCF.vcf.gz |\\
-		sort > sorted_samples.txt 
-
-		bcftools view -v snps \\
-		-S sorted_samples.txt \\
-		-R markers.txt \\
-		Phenotyped_Strain_VCF.vcf.gz |\\
-		bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' |\\
-		sed 's/[[# 0-9]*]//g' |\\
-		sed 's/:GT//g' |\\
-		sed 's/0|0/-1/g' |\\
-		sed 's/1|1/1/g' |\\
-		sed 's/0|1/NA/g' |\\
-		sed 's/1|0/NA/g' |\\
-		sed 's/.|./NA/g'  |\\
-		sed 's/0\\/0/-1/g' |\\
-		sed 's/1\\/1/1/g'  |\\
-		sed 's/0\\/1/NA/g' |\\
-		sed 's/1\\/0/NA/g' |\\
-		sed 's/.\\/./NA/g' > Genotype_Matrix.tsv
-
+	bcftools view -v snps \\
+	-S sorted_samples.txt \\
+	-R markers.txt \\
+	Phenotyped_Strain_VCF.vcf.gz |\\
+	bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' |\\
+	sed 's/[[# 0-9]*]//g' |\\
+	sed 's/:GT//g' |\\
+	sed 's/0|0/-1/g' |\\
+	sed 's/1|1/1/g' |\\
+	sed 's/0|1/NA/g' |\\
+	sed 's/1|0/NA/g' |\\
+	sed 's/.|./NA/g'  |\\
+	sed 's/0\\/0/-1/g' |\\
+	sed 's/1\\/1/1/g'  |\\
+	sed 's/0\\/1/NA/g' |\\
+	sed 's/1\\/0/NA/g' |\\
+	sed 's/.\\/./NA/g' > Genotype_Matrix.tsv
 	"""
 
 }
@@ -422,8 +394,8 @@ process chrom_eigen_variants {
 
 	tag { CHROM }
 
-	cpus 6
-	memory params.eigen_mem
+	label "R"
+	label "md"
 
 	input:
 		tuple val(CHROM), file(genotypes)
@@ -434,11 +406,11 @@ process chrom_eigen_variants {
 
 
 	"""
-		cat Genotype_Matrix.tsv |\\
-		awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
+	cat Genotype_Matrix.tsv |\\
+	awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
 
-		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R > Get_GenoMatrix_Eigen.R
-		Rscript --vanilla Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
+	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R > Get_GenoMatrix_Eigen.R
+	Rscript --vanilla Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
 	"""
 
 }
@@ -450,10 +422,9 @@ process chrom_eigen_variants {
 process collect_eigen_variants {
 
 	executor 'local'
+	container null
 
 	publishDir "${params.out}/Genotype_Matrix", mode: 'copy'
-
-	cpus 1
 
 	input:
 		file(chrom_tests) //from sig_snps_geno_matrix.collect()
@@ -462,9 +433,9 @@ process collect_eigen_variants {
 		file("total_independent_tests.txt") //into independent_tests
 
 	"""
-		cat *independent_snvs.csv |\\
-		grep -v inde |\\
-		awk '{s+=\$1}END{print s}' > total_independent_tests.txt
+	cat *independent_snvs.csv |\\
+	grep -v inde |\\
+	awk '{s+=\$1}END{print s}' > total_independent_tests.txt
 	"""
 
 }
@@ -486,14 +457,13 @@ process collect_eigen_variants {
 
 process rrblup_maps {
 
-	cpus 4
+	label "md"
+	label "R"
 
 	tag { TRAIT }
 
 	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*processed_mapping.tsv"
 	publishDir "${params.out}/Mappings/Plots", mode: 'copy', pattern: "*.pdf"
-
-	
 
 	input:
 	tuple file("independent_snvs.csv"), path(geno), val(TRAIT), path(pheno), val(P3D), val(sig_thresh), val(qtl_grouping_size), val(qtl_ci_size) 
@@ -511,9 +481,9 @@ process rrblup_maps {
 
     Rscript --vanilla Run_Mappings.R ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
 
-		if [ -e Rplots.pdf ]; then
-    		rm Rplots.pdf
-		fi
+	if [ -e Rplots.pdf ]; then
+		rm Rplots.pdf
+	fi
 	"""
 }
 
@@ -529,8 +499,8 @@ process summarize_maps {
 	publishDir "${params.out}/Mappings/Plots", mode: 'copy', pattern: "*mappings.pdf"
 	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "QTL_peaks.tsv"
 
-    memory { 16.GB * task.attempt }
-    errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
+	label "R"
+	label "ml"
 
 	input:
 	file(maps)
@@ -573,24 +543,25 @@ process summarize_maps {
 
 process LD_between_regions {
 
-  tag { TRAIT }
+	label "xs"
+	label "R"
 
-  publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*LD_between_QTL_regions.tsv"
+	tag { TRAIT }
 
-  input:
-  tuple val(TRAIT), path("processed_mapping.tsv"), path("Genotype_Matrix.tsv")
+	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "*LD_between_QTL_regions.tsv"
 
-  output:
-  tuple val(TRAIT), path("*LD_between_QTL_regions.tsv") optional true
-  val TRAIT, emit: linkage_done
+	input:
+	tuple val(TRAIT), path("processed_mapping.tsv"), path("Genotype_Matrix.tsv")
 
-  """
+	output:
+	tuple val(TRAIT), path("*LD_between_QTL_regions.tsv") optional true
+	val TRAIT, emit: linkage_done
 
-    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
+	"""
+	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/LD_between_regions.R > LD_between_regions.R 
 
-    Rscript --vanilla LD_between_regions.R Genotype_Matrix.tsv processed_mapping.tsv ${TRAIT}
-
-  """
+	Rscript --vanilla LD_between_regions.R Genotype_Matrix.tsv processed_mapping.tsv ${TRAIT}
+	"""
 }
 
 /*
@@ -609,6 +580,9 @@ process LD_between_regions {
 
 process prep_ld_files {
 
+	label "ml"
+	label "plink"
+
 	tag {TRAIT}
 
 	input:
@@ -618,79 +592,79 @@ process prep_ld_files {
 		tuple val(TRAIT), val(CHROM), val(start_pos), val(peak_pos), val(end_pos), val(log10p), val(var_exp), val(h2), path(complete_geno), path(phenotype), path(pr_map), path(vcf), path(index), path("*ROI_Genotype_Matrix.tsv"), path("*LD.tsv") 
 
 	"""
-		echo "HELLO"
-		cat ${pr_map} |\\
-		awk '\$0 !~ "\\tNA\\t" {print}' |\\
-		awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
-		awk 'NR>1{print \$2, \$5, \$12, \$13, \$14}' OFS="\\t" > ${TRAIT}_QTL_peaks.tsv
+	echo "HELLO"
+	cat ${pr_map} |\\
+	awk '\$0 !~ "\\tNA\\t" {print}' |\\
+	awk '!seen[\$2,\$5,\$12,\$13,\$14]++' |\\
+	awk 'NR>1{print \$2, \$5, \$12, \$13, \$14}' OFS="\\t" > ${TRAIT}_QTL_peaks.tsv
 
-		filename='${TRAIT}_QTL_peaks.tsv'
-		echo Start
-		while read p; do 
-		    chromosome=`echo \$p | cut -f1 -d' '`
-		    trait=`echo \$p | cut -f2 -d' '`
-		    start_pos=`echo \$p | cut -f3 -d' '`
-		    peak_pos=`echo \$p | cut -f4 -d' '`
-		    end_pos=`echo \$p | cut -f5 -d' '`
-		
-		cat ${phenotype} | awk '\$0 !~ "strain" {print}' | cut -f1 > phenotyped_samples.txt
+	filename='${TRAIT}_QTL_peaks.tsv'
+	echo Start
+	while read p; do 
+		chromosome=`echo \$p | cut -f1 -d' '`
+		trait=`echo \$p | cut -f2 -d' '`
+		start_pos=`echo \$p | cut -f3 -d' '`
+		peak_pos=`echo \$p | cut -f4 -d' '`
+		end_pos=`echo \$p | cut -f5 -d' '`
+	
+	cat ${phenotype} | awk '\$0 !~ "strain" {print}' | cut -f1 > phenotyped_samples.txt
 
-		bcftools view --regions \$chromosome:\$start_pos-\$end_pos ${vcf} \
-		-S phenotyped_samples.txt |\\
-		bcftools filter -i N_MISSING=0 |\\
-		awk '\$0 !~ "#" {print \$1":"\$2}' > \$trait.\$chromosome.\$start_pos.\$end_pos.txt
+	bcftools view --regions \$chromosome:\$start_pos-\$end_pos ${vcf} \
+	-S phenotyped_samples.txt |\\
+	bcftools filter -i N_MISSING=0 |\\
+	awk '\$0 !~ "#" {print \$1":"\$2}' > \$trait.\$chromosome.\$start_pos.\$end_pos.txt
 
 
-		bcftools view --regions \$chromosome:\$start_pos-\$end_pos ${vcf} \
-		-S phenotyped_samples.txt |\\
-		bcftools filter -i N_MISSING=0 -Oz -o finemap.vcf.gz
+	bcftools view --regions \$chromosome:\$start_pos-\$end_pos ${vcf} \
+	-S phenotyped_samples.txt |\\
+	bcftools filter -i N_MISSING=0 -Oz -o finemap.vcf.gz
 
-		plink --vcf finemap.vcf.gz \\
-			--snps-only \\
-			--maf 0.05 \\
-			--biallelic-only \\
-			--allow-extra-chr \\
-			--set-missing-var-ids @:# \\
-			--geno \\
-			--make-bed \\
-			--recode vcf-iid bgz \\
-			--extract \$trait.\$chromosome.\$start_pos.\$end_pos.txt \\
-			--out \$trait.\$chromosome.\$start_pos.\$end_pos
+	plink --vcf finemap.vcf.gz \\
+		--snps-only \\
+		--maf 0.05 \\
+		--biallelic-only \\
+		--allow-extra-chr \\
+		--set-missing-var-ids @:# \\
+		--geno \\
+		--make-bed \\
+		--recode vcf-iid bgz \\
+		--extract \$trait.\$chromosome.\$start_pos.\$end_pos.txt \\
+		--out \$trait.\$chromosome.\$start_pos.\$end_pos
 
-		nsnps=`wc -l \$trait.\$chromosome.\$start_pos.\$end_pos.txt | cut -f1 -d' '`
+	nsnps=`wc -l \$trait.\$chromosome.\$start_pos.\$end_pos.txt | cut -f1 -d' '`
 
-		plink --r2 with-freqs \\
-			--allow-extra-chr \\
-			--snps-only \\
-			--ld-window-r2 0 \\
-			--ld-snp \$chromosome:\$peak_pos \\
-			--ld-window \$nsnps \\
-			--ld-window-kb 6000 \\
-			--chr \$chromosome \\
-			--out \$trait.\$chromosome:\$start_pos-\$end_pos.QTL \\
-			--set-missing-var-ids @:# \\
-			--vcf \$trait.\$chromosome.\$start_pos.\$end_pos.vcf.gz
+	plink --r2 with-freqs \\
+		--allow-extra-chr \\
+		--snps-only \\
+		--ld-window-r2 0 \\
+		--ld-snp \$chromosome:\$peak_pos \\
+		--ld-window \$nsnps \\
+		--ld-window-kb 6000 \\
+		--chr \$chromosome \\
+		--out \$trait.\$chromosome:\$start_pos-\$end_pos.QTL \\
+		--set-missing-var-ids @:# \\
+		--vcf \$trait.\$chromosome.\$start_pos.\$end_pos.vcf.gz
 
-		sed 's/  */\\t/g' \$trait.\$chromosome:\$start_pos-\$end_pos.QTL.ld |\\
-		cut -f2-10 |\\
-		sed 's/^23/X/g' | sed 's/\\t23\\t/\\tX\\t/g' > \$trait.\$chromosome.\$start_pos.\$end_pos.LD.tsv
+	sed 's/  */\\t/g' \$trait.\$chromosome:\$start_pos-\$end_pos.QTL.ld |\\
+	cut -f2-10 |\\
+	sed 's/^23/X/g' | sed 's/\\t23\\t/\\tX\\t/g' > \$trait.\$chromosome.\$start_pos.\$end_pos.LD.tsv
 
-		bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' finemap.vcf.gz |\\
-			sed 's/[[# 0-9]*]//g' |\\
-			sed 's/:GT//g' |\\
-			sed 's/0|0/-1/g' |\\
-			sed 's/1|1/1/g' |\\
-			sed 's/0|1/NA/g' |\\
-			sed 's/1|0/NA/g' |\\
-			sed 's/.|./NA/g'  |\\
-			sed 's/0\\/0/-1/g' |\\
-			sed 's/1\\/1/1/g'  |\\
-			sed 's/0\\/1/NA/g' |\\
-			sed 's/1\\/0/NA/g' |\\
-			sed 's/.\\/./NA/g' |\\
-			sed 's/^23/X/g' > \$trait.\$chromosome:\$start_pos-\$end_pos.ROI_Genotype_Matrix.tsv
+	bcftools query --print-header -f '%CHROM\\t%POS\\t%REF\\t%ALT[\\t%GT]\\n' finemap.vcf.gz |\\
+		sed 's/[[# 0-9]*]//g' |\\
+		sed 's/:GT//g' |\\
+		sed 's/0|0/-1/g' |\\
+		sed 's/1|1/1/g' |\\
+		sed 's/0|1/NA/g' |\\
+		sed 's/1|0/NA/g' |\\
+		sed 's/.|./NA/g'  |\\
+		sed 's/0\\/0/-1/g' |\\
+		sed 's/1\\/1/1/g'  |\\
+		sed 's/0\\/1/NA/g' |\\
+		sed 's/1\\/0/NA/g' |\\
+		sed 's/.\\/./NA/g' |\\
+		sed 's/^23/X/g' > \$trait.\$chromosome:\$start_pos-\$end_pos.ROI_Genotype_Matrix.tsv
 
-		done < \$filename
+	done < \$filename
 	"""
 }
 
@@ -700,7 +674,10 @@ process prep_ld_files {
 
 process rrblup_fine_maps {
 
-  errorStrategy { task.attempt == 3 ? 'ignore' : 'retry' }
+	label "md"
+	label "R"
+
+	errorStrategy { task.attempt == 3 ? 'ignore' : 'retry' }
 
 	publishDir "${params.out}/Fine_Mappings/Plots", mode: 'copy', pattern: "*_finemap_plot.pdf"
 	publishDir "${params.out}/Fine_Mappings/Data", mode: 'copy', pattern: "*_prLD_df.tsv"
@@ -715,19 +692,18 @@ process rrblup_fine_maps {
 		tuple path("*pdf"), path("*prLD_df.tsv")
 
 	"""
-        for i in *ROI_Genotype_Matrix.tsv;
-        do
-        	start_pos=`echo \$i | cut -f2 -d':' | cut -f1 -d'.' | cut -f1 -d'-'`
-        	end_pos=`echo \$i | cut -f2 -d':' | cut -f1 -d'.' | cut -f2 -d'-'`
+	for i in *ROI_Genotype_Matrix.tsv;
+	do
+		start_pos=`echo \$i | cut -f2 -d':' | cut -f1 -d'.' | cut -f1 -d'-'`
+		end_pos=`echo \$i | cut -f2 -d':' | cut -f1 -d'.' | cut -f2 -d'-'`
 
-        	ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
-        	echo "\$ld_file"
+		ld_file=`ls *LD.tsv | grep "\$start_pos" | grep "\$end_pos" | tr -d '\\n'`
+		echo "\$ld_file"
 
-          echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Finemap_QTL_Intervals.R > Finemap_QTL_Intervals.R
-          
-          Rscript --vanilla Finemap_QTL_Intervals.R ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
-        done   
-
+		echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Finemap_QTL_Intervals.R > Finemap_QTL_Intervals.R
+		
+		Rscript --vanilla Finemap_QTL_Intervals.R ${complete_geno} \$i ${pr_map} \$ld_file ${task.cpus} ${params.p3d}
+	done   
 	"""
 }
 
@@ -740,6 +716,7 @@ process concatenate_LD_per_trait {
 	tag {TRAIT}
 
 	executor 'local'
+	container null
 
 	input:
 		tuple val(TRAIT), path(phenotype), path(roi_geno_matrix), path(processed_ld)
@@ -749,25 +726,25 @@ process concatenate_LD_per_trait {
 		tuple val(TRAIT), file("${TRAIT}.combined_peak_LD.tsv"), file(phenotype)
 
 	"""
-		for i in *prLD_df.tsv;
-		do
-		chrom=`head -2 \$i | tail -1 | cut -f2`
-		start_pos=`echo \$i | rev | cut -f3 -d"_" | cut -f2 -d'.' | rev`
-		end_pos=`echo \$i | rev | cut -f3 -d"_" | cut -f1 -d'.' | rev`
+	for i in *prLD_df.tsv;
+	do
+	chrom=`head -2 \$i | tail -1 | cut -f2`
+	start_pos=`echo \$i | rev | cut -f3 -d"_" | cut -f2 -d'.' | rev`
+	end_pos=`echo \$i | rev | cut -f3 -d"_" | cut -f1 -d'.' | rev`
 
-		echo "${TRAIT} \$chrom \$start_pos \$end_pos"
+	echo "${TRAIT} \$chrom \$start_pos \$end_pos"
 
-		awk 'BEGIN{OFS="\\t"};FNR == 1 {next};\$1=\$1' OFS="\\t" \$i |\
-		awk -v trait="${TRAIT}" \
-			-v chrom="\$chrom" \
-			-v start_pos="\$start_pos" \
-			-v end_pos="\$end_pos" \
-			'{print \$0, trait, start_pos, end_pos}' OFS="\t" > ${TRAIT}.\$chrom.\$start_pos.\$end_pos.pr_ld.tsv
-		done
+	awk 'BEGIN{OFS="\\t"};FNR == 1 {next};\$1=\$1' OFS="\\t" \$i |\
+	awk -v trait="${TRAIT}" \
+		-v chrom="\$chrom" \
+		-v start_pos="\$start_pos" \
+		-v end_pos="\$end_pos" \
+		'{print \$0, trait, start_pos, end_pos}' OFS="\t" > ${TRAIT}.\$chrom.\$start_pos.\$end_pos.pr_ld.tsv
+	done
 
-		cat *pr_ld.tsv |\
-		awk 'BEGIN{OFS="\\t"; print "marker", "CHROM", "POS", "log10p", "peak_marker", "peak_maf", "maf_marker_b", "ld_r2", "REF", "ALT", "allele", "strain", "trait", "start_pos", "end_pos"}; 
-			{print \$0}' > ${TRAIT}.combined_peak_LD.tsv
+	cat *pr_ld.tsv |\
+	awk 'BEGIN{OFS="\\t"; print "marker", "CHROM", "POS", "log10p", "peak_marker", "peak_maf", "maf_marker_b", "ld_r2", "REF", "ALT", "allele", "strain", "trait", "start_pos", "end_pos"}; 
+		{print \$0}' > ${TRAIT}.combined_peak_LD.tsv
 	"""
 
 }
@@ -778,10 +755,8 @@ process concatenate_LD_per_trait {
 
 process plot_genes {
 
-	cpus 1
-    memory { 32.GB * task.attempt }
-    //errorStrategy { task.exitStatus == 137 ? 'retry' : 'terminate' }
-    //errorStrategy 'ignore'
+	label "ml"
+	label "R"
 
 	tag {phenotype}
 
@@ -814,6 +789,9 @@ process plot_genes {
 
 
 process burden_mapping {
+
+	label "sm"
+	label "R"
 
 	tag {TRAIT}
 
@@ -848,7 +826,8 @@ process burden_mapping {
 
 process plot_burden {
 
-	executor 'local'
+	label "sm"
+	label "R"
 
 	tag {TRAIT}
 
@@ -891,31 +870,32 @@ val(TRAIT) into linkage_done
 
 process html_report_main {
 
-  executor 'local'
-  errorStrategy 'ignore'
+	label "md"
+	label "R"
 
-  tag {TRAIT}
-  memory '16 GB'
-  
+	errorStrategy 'ignore'
 
-  publishDir "${params.out}", mode: 'copy'
+	tag {TRAIT}
 
 
-  input:
-    tuple val(TRAIT), file(a), file(b), val(peaks_done)
-
-  output:
-    tuple file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html")
+	publishDir "${params.out}", mode: 'copy'
 
 
-  """
-    cat "${workflow.projectDir}/bin/cegwas2_report_main.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}_main.Rmd 
+	input:
+		tuple val(TRAIT), file(a), file(b), val(peaks_done)
 
-    echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+	output:
+		tuple file("cegwas2_report_*.Rmd"), file("cegwas2_report_*.html")
 
-    Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_main.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
 
-  """
+	"""
+	cat "${workflow.projectDir}/bin/cegwas2_report_main.Rmd" | sed "s/TRAIT_NAME_HOLDER/${TRAIT}/g" > cegwas2_report_${TRAIT}_main.Rmd 
+
+	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+
+	Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_main.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
+
+	"""
 }
 
 
@@ -927,30 +907,29 @@ process html_report_main {
 
 process html_region_prep_table {
 
-  executor 'local'
+	label "sm"
+	label "bedtools"
 
-  publishDir "${params.out}/Divergent_and_haplotype", mode: 'copy'
+	publishDir "${params.out}/Divergent_and_haplotype", mode: 'copy'
+
+	input:
+		file("qtl_peak.tsv")
+	output:
+		tuple file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_isotype_list.txt"), emit: div_hap_table
+		val true, emit: html_region_prep_table_done
 
 
-  input:
-    file("qtl_peak.tsv")
-  output:
-    tuple file("all_QTL_bins.bed"), file("all_QTL_div.bed"), file("haplotype_in_QTL_region.txt"), file("div_isotype_list.txt"), emit: div_hap_table
-    val true, emit: html_region_prep_table_done
+	"""
+	cat qtl_peak.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
 
+	bedtools intersect -wa -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_bins.bed
 
-  """
-  cat qtl_peak.tsv | awk -v OFS='\t' '{print \$2,\$3,\$5}' > QTL_region.bed
+	bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_div.bed
 
-  bedtools intersect -wa -a ${workflow.projectDir}/bin/divergent_bins.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_bins.bed
+	bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo | sort -k1,1 -k2,2n | uniq > haplotype_in_QTL_region.txt
 
-  bedtools intersect -a ${workflow.projectDir}/bin/divergent_df_isotype.bed -b QTL_region.bed | sort -k1,1 -k2,2n | uniq > all_QTL_div.bed
-
-  bedtools intersect -a ${workflow.projectDir}/bin/haplotype_df_isotype.bed -b QTL_region.bed -wo | sort -k1,1 -k2,2n | uniq > haplotype_in_QTL_region.txt
-
-  cp ${workflow.projectDir}/bin/div_isotype_list.txt . 
-
-  """
+	cp ${workflow.projectDir}/bin/div_isotype_list.txt . 
+	"""
 
 }
 
@@ -963,7 +942,9 @@ process html_region_prep_table {
 process html_report_region {
 
 	tag "$TRAIT $CHROM $peak_pos"
-    memory '20 GB'
+    
+	label "ml"
+	label "R"
 
     errorStrategy 'ignore'
 
@@ -979,13 +960,9 @@ process html_report_region {
 
 	"""
     if (( ${end_pos}-1500000 < ${start_pos} )); then
-
-		  cat "${workflow.projectDir}/bin/cegwas2_report_region.Rmd" | sed -e "s/TRAIT_NAME_HOLDER/${TRAIT}/g" -e "s/QTL_CHROM_HOLDER/${CHROM}/g" -e "s/QTL_REGION_START_HOLDER/${start_pos}/g" -e "s/QTL_PEAK_HOLDER/${peak_pos}/g" -e "s/QTL_REGION_END_HOLDER/${end_pos}/g" > cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd 
-
-      echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
-
-		  Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
-
+		cat "${workflow.projectDir}/bin/cegwas2_report_region.Rmd" | sed -e "s/TRAIT_NAME_HOLDER/${TRAIT}/g" -e "s/QTL_CHROM_HOLDER/${CHROM}/g" -e "s/QTL_REGION_START_HOLDER/${start_pos}/g" -e "s/QTL_PEAK_HOLDER/${peak_pos}/g" -e "s/QTL_REGION_END_HOLDER/${end_pos}/g" > cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd
+        echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" > .Rprofile
+        Rscript -e "rmarkdown::render('cegwas2_report_${TRAIT}_region_${CHROM}.${start_pos}-${end_pos}.Rmd', knit_root_dir='${workflow.launchDir}/${params.out}')"
     fi
 	"""
 
@@ -1053,6 +1030,5 @@ workflow.onComplete {
     //if (params.email) {
     //    ['mail', '-s', 'cegwas2-nf', params.email].execute() << summary
     //}
-
 
 }
