@@ -165,7 +165,7 @@ if(params.debug) {
     // Genotype matrix
     pheno_strains = fix_strain_names_bulk.out.phenotyped_strains_to_analyze
 
-    vcf.spread(vcf_index)
+    vcf.combine(vcf_index)
     		.combine(pheno_strains) | vcf_to_geno_matrix
 
     // EIGEN
@@ -175,12 +175,12 @@ if(params.debug) {
 
 	// GWAS mapping
 	collect_eigen_variants.out
-			.spread(vcf_to_geno_matrix.out)
-			.spread(traits_to_map)
-			.spread(Channel.from("${params.p3d}"))
-			.spread(Channel.from("${params.sthresh}"))
-			.spread(Channel.from("${params.group_qtl}"))
-			.spread(Channel.from("${params.ci_size}")) | rrblup_maps
+			.combine(vcf_to_geno_matrix.out)
+			.combine(traits_to_map)
+			.combine(Channel.from("${params.p3d}"))
+			.combine(Channel.from("${params.sthresh}"))
+			.combine(Channel.from("${params.group_qtl}"))
+			.combine(Channel.from("${params.ci_size}")) | rrblup_maps
 
 	// summarize
 	rrblup_maps.out.processed_map_to_summary_plot.collect() | summarize_maps
@@ -196,21 +196,21 @@ if(params.debug) {
 			   .splitCsv(sep: '\t')
 			   .join(rrblup_maps.out.processed_map_to_ld)
 			   .join(rrblup_maps.out.pr_maps_trait)
-			   .spread(impute_vcf.spread(impute_vcf_index))
-			   .spread(pheno_strains) | prep_ld_files | rrblup_fine_maps
+			   .combine(impute_vcf.combine(impute_vcf_index))
+			   .combine(pheno_strains) | prep_ld_files | rrblup_fine_maps
 		rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
 
 		// Plot fine map\
 		Channel.fromPath("${params.genes}")
-			.spread(concatenate_LD_per_trait.out)
-			.spread(Channel.fromPath("${params.annvcf}")) | plot_genes
+			.combine(concatenate_LD_per_trait.out)
+			.combine(Channel.fromPath("${params.annvcf}")) | plot_genes
 
 
 		// Burden mapping
 		if(params.burden) {
 			traits_to_map
-				.spread(vcf.spread(vcf_index))
-				.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+				.combine(vcf.combine(vcf_index))
+				.combine(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
 
 
 			// generate html report -- change this to accomate no burden too?
@@ -238,8 +238,8 @@ if(params.debug) {
 	} else {
 		if(params.burden) {
 			traits_to_map
-					.spread(vcf.spread(vcf_index))
-					.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+					.combine(vcf.combine(vcf_index))
+					.combine(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
 		}
 		if(params.report) {
 			println """
