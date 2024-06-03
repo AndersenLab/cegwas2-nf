@@ -2,7 +2,7 @@
 
 if( !nextflow.version.matches('23.0+') ) {
     println "This workflow requires Nextflow version 23.0 or greater -- You are running version $nextflow.version"
-    if (${params.platform == "local") {
+    if (${params.platform} == "local") {
 		println "On your local platform, you can use conda to create a conda environment with 'nextflow>=23.0'. Then activate this environment to run the worklflow. You will also need docker running."
 	} else {
 		println "On ${params.platform}, you can use `module load python/${params.anaconda}; source activate ${params.softwareDir}/conda_envs/nf20_env`"
@@ -21,6 +21,12 @@ params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
 params.R_libpath = "${params.softwareDir}/R_lib_3.6.0"
 
+if (${params.debug}) {
+	params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
+	params.annotation = "bcsq"
+	params.annvcf = "${workflow.projectDir}/bin/WI.330_TEST.strain-annotation.bcsq.tsv"
+}
+
 println()
 
 log.info ""
@@ -37,7 +43,7 @@ if (params.help) {
     log.info ""
     log.info "REQUIRES NEXTFLOW VERSION 23.0+"
     log.info ">> module load python/${params.anaconda}"
-    log.info ">> source activate ${params.softwareDir/}conda_envs/nf23_env"
+    log.info ">> source activate ${params.softwareDir}/conda_envs/nf23_env"
     log.info "nextflow main.nf --traitfile=test_bulk --vcf 20210121 --annotation bcsq"
     log.info ""
     log.info "Mandatory arguments:"
@@ -49,7 +55,6 @@ if (params.help) {
    	log.info "--out                    String                Name of folder that will contain the results"
    	log.info "--vcf                    String                Cendr release date of vcf to use for analysis (i.e. 20210121)"
     log.info "--p3d                    BOOLEAN               Set to FALSE for EMMA algortith, TRUE for EMMAx"
-    log.info "--e_mem                  String                Value that corresponds to the amount of memory to allocate for eigen decomposition of chromosomes (DEFAULT = 100)"
     log.info "--burden                 BOOLEAN               Whether or not to perform burden mapping (DEFAULT = TRUE). NOTE: HTML report will not be generated if burden is set to FALSE."
     log.info "--finemap                BOOLEAN               Whether or not to perform fine-mapping (DEFAULT = TRUE)"
     log.info "--report                 BOOLEAN               Whether or not to generate HTML report for each trait (DEFAULT = TRUE). Change to FALSE if you are mapping many traits. Requires burden = TRUE to run."
@@ -61,7 +66,7 @@ if (params.help) {
     log.info "--freqUpper              Float                 Maximum allele frequency for a variant to be considered for burden mapping, (DEFAULT = 0.05)"
     log.info "--minburden              Interger              Minimum number of strains to have a variant for the variant to be considered for burden mapping, (DEFAULT = 2)"
     log.info "--genes                  String                refFlat file format that contains start and stop genomic coordinates for genes of interest, (DEFAULT = bin/gene_ref_flat.Rda)"
-    log.info "--R_libpath              String                Path to the required R libraries (DEFAULT = ${params/softareDir}/R_lib_3.6.0)"
+    log.info "--R_libpath              String                Path to the required R libraries (DEFAULT = ${params.softwareDir}/R_lib_3.6.0)"
     log.info ""
     log.info "--------------------------------------------------------"
     log.info "Information describing the stucture of the input files can be located in input_files/README.txt"
@@ -69,18 +74,6 @@ if (params.help) {
     log.info ""
     log.info "Flags:"
     log.info "--help                                      Display this message"
-    log.info ""
-    log.info "--------------------------------------------------------"
-    log.info ""
-    log.info " Required software packages to be in users path"
-    log.info "BCFtools               v1.9"
-    log.info "plink                  v1.9"
-    log.info "R-cegwas2              Found on GitHub"
-    log.info "R-tidyverse            v1.2.1"
-    log.info "R-correlateR           Found on GitHub"
-    log.info "R-rrBLUP               v4.6"
-    log.info "R-RSpectra             v0.13-1"
-    log.info "R-ggbeeswarm           v0.6.0"
     log.info "--------------------------------------------------------"    
     exit 1
 } else {
@@ -100,7 +93,6 @@ log.info "Min Strains with Variant for Burden     = ${params.minburden}"
 log.info "Threshold for grouping QTL              = ${params.group_qtl}"
 log.info "Number of SNVs to define CI             = ${params.ci_size}"
 log.info "Fix isotype names and prune data        = ${params.fix_names}"
-log.info "Eigen Memory allocation                 = ${params.eigen_mem}"
 log.info "Path to R libraries.                    = ${params.R_libpath}"
 log.info ""
 log.info "------------------------------------------------------------"
@@ -131,10 +123,7 @@ if(params.debug) {
 	    vcf = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz")
 	    vcf_index = Channel.fromPath("${workflow.projectDir}/bin/330_TEST.vcf.gz.tbi")
       	impute_vcf = vcf //use same vcf for finemap and mapping in debug
-      	impute_vcf_index = vcf_index
-	    params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
-	    params.annotation = "bcsq"
-	    params.annvcf = "${workflow.projectDir}/bin/WI.330_TEST.strain-annotation.bcsq.tsv"
+		impute_vcf_index = vcf_index
 
 	} else { 
 		if("${params.vcf}" != "20210121" & ${params.vcf} != "20220216" & ${params.vcf} != "20231213") {
