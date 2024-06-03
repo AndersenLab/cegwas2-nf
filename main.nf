@@ -21,7 +21,7 @@ params.refflat   = "${workflow.projectDir}/bin/refFlat.ws245.txt"
 params.genes     = "${workflow.projectDir}/bin/gene_ref_flat.Rda"
 params.R_libpath = "${params.softwareDir}/R_lib_3.6.0"
 
-if (${params.debug}) {
+if (params.debug) {
 	params.traitfile = "${workflow.projectDir}/test_traits/PC1.tsv"
 	params.annotation = "bcsq"
 	params.annvcf = "${workflow.projectDir}/bin/WI.330_TEST.strain-annotation.bcsq.tsv"
@@ -126,7 +126,7 @@ if(params.debug) {
 		impute_vcf_index = vcf_index
 
 	} else { 
-		if("${params.vcf}" != "20210121" & ${params.vcf} != "20220216" & ${params.vcf} != "20231213") {
+		if("${params.vcf}" != "20210121" & "${params.vcf}" != "20220216" & "${params.vcf}" != "20231213") {
 			println("ERROR. Please choose either 20210121, 20220216, or 20231213 for the --vcf parameter")
 			exit 1
 		}
@@ -186,7 +186,7 @@ if(params.debug) {
 	rrblup_maps.out.processed_map_to_summary_plot.collect() | summarize_maps
 
 	// only continue if manplot_only = false
-	if(${params.finemap} & ${params.manplot} == False) {
+	if(params.finemap & params.manplot == False) {
 		// LD
 		rrblup_maps.out.pr_maps_trait
 				.combine(vcf_to_geno_matrix.out) | LD_between_regions
@@ -207,14 +207,14 @@ if(params.debug) {
 
 
 		// Burden mapping
-		if(${params.burden}) {
+		if(params.burden) {
 			traits_to_map
 				.spread(vcf.spread(vcf_index))
 				.spread(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
 
 
 			// generate html report -- change this to accomate no burden too?
-			if(${params.report}) {
+			if(params.report) {
 
 				plot_burden.out
 					.join(LD_between_regions.out.linkage_done)
@@ -227,7 +227,7 @@ if(params.debug) {
 			    	.combine(html_region_prep_table.out.html_region_prep_table_done) | html_report_region
 
 			}
-		} else if(${params.report}) {
+		} else if(params.report) {
 			println """
 
 	        ERROR: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
