@@ -139,6 +139,7 @@ if(params.debug) {
 			}
 
 	      	vcf = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz")
+			
 			vcf_index = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.hard-filter.isotype.vcf.gz.tbi")
 			impute_vcf = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz")
 	      	impute_vcf_index = Channel.fromPath("${params.dataDir}/c_elegans/WI/variation/${params.vcf}/vcf/WI.${params.vcf}.impute.isotype.vcf.gz.tbi")
@@ -182,74 +183,74 @@ if(params.debug) {
 			.combine(Channel.from("${params.group_qtl}"))
 			.combine(Channel.from("${params.ci_size}")) | rrblup_maps
 
-	// summarize
-	rrblup_maps.out.processed_map_to_summary_plot.collect() | summarize_maps
+	// // summarize
+	// rrblup_maps.out.processed_map_to_summary_plot.collect() | summarize_maps
 
-	// only continue if manplot_only = false
-	if(params.finemap & params.manplot == False) {
-		// LD
-		rrblup_maps.out.pr_maps_trait
-				.combine(vcf_to_geno_matrix.out) | LD_between_regions
+	// // only continue if manplot_only = false
+	// if(params.finemap & params.manplot == False) {
+	// 	// LD
+	// 	rrblup_maps.out.pr_maps_trait
+	// 			.combine(vcf_to_geno_matrix.out) | LD_between_regions
 
-		// Fine map
-		summarize_maps.out.qtl_peaks
-			   .splitCsv(sep: '\t')
-			   .join(rrblup_maps.out.processed_map_to_ld)
-			   .join(rrblup_maps.out.pr_maps_trait)
-			   .combine(impute_vcf.combine(impute_vcf_index))
-			   .combine(pheno_strains) | prep_ld_files | rrblup_fine_maps
-		rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
+	// 	// Fine map
+	// 	summarize_maps.out.qtl_peaks
+	// 		   .splitCsv(sep: '\t')
+	// 		   .join(rrblup_maps.out.processed_map_to_ld)
+	// 		   .join(rrblup_maps.out.pr_maps_trait)
+	// 		   .combine(impute_vcf.combine(impute_vcf_index))
+	// 		   .combine(pheno_strains) | prep_ld_files | rrblup_fine_maps
+	// 	rrblup_fine_maps.out.prLD | concatenate_LD_per_trait
 
-		// Plot fine map\
-		Channel.fromPath("${params.genes}")
-			.combine(concatenate_LD_per_trait.out)
-			.combine(Channel.fromPath("${params.annvcf}")) | plot_genes
-
-
-		// Burden mapping
-		if(params.burden) {
-			traits_to_map
-				.combine(vcf.combine(vcf_index))
-				.combine(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+	// 	// Plot fine map\
+	// 	Channel.fromPath("${params.genes}")
+	// 		.combine(concatenate_LD_per_trait.out)
+	// 		.combine(Channel.fromPath("${params.annvcf}")) | plot_genes
 
 
-			// generate html report -- change this to accomate no burden too?
-			if(params.report) {
+	// 	// Burden mapping
+	// 	if(params.burden) {
+	// 		traits_to_map
+	// 			.combine(vcf.combine(vcf_index))
+	// 			.combine(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
 
-				plot_burden.out
-					.join(LD_between_regions.out.linkage_done)
-					.combine(summarize_maps.out.qtl_peaks_done) | html_report_main
-				summarize_maps.out.qtl_peaks | html_region_prep_table
 
-			    summarize_maps.out.qtl_peaks
-			    	.splitCsv(sep: '\t')
-			    	.combine(plot_genes.out.gene_plts_done, by: 0)
-			    	.combine(html_region_prep_table.out.html_region_prep_table_done) | html_report_region
+	// 		// generate html report -- change this to accomate no burden too?
+	// 		if(params.report) {
 
-			}
-		} else if(params.report) {
-			println """
+	// 			plot_burden.out
+	// 				.join(LD_between_regions.out.linkage_done)
+	// 				.combine(summarize_maps.out.qtl_peaks_done) | html_report_main
+	// 			summarize_maps.out.qtl_peaks | html_region_prep_table
 
-	        ERROR: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
+	// 		    summarize_maps.out.qtl_peaks
+	// 		    	.splitCsv(sep: '\t')
+	// 		    	.combine(plot_genes.out.gene_plts_done, by: 0)
+	// 		    	.combine(html_region_prep_table.out.html_region_prep_table_done) | html_report_region
 
-	        """
-	        exit 1
-		}
-	} else {
-		if(params.burden) {
-			traits_to_map
-					.combine(vcf.combine(vcf_index))
-					.combine(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
-		}
-		if(params.report) {
-			println """
+	// 		}
+	// 	} else if(params.report) {
+	// 		println """
 
-	        ERROR: HTML reports will not be generated because --finemap=FALSE. To generate HTML reports, please set --finemap=TRUE
+	//         ERROR: HTML reports will not be generated because --burden=FALSE. To generate HTML reports, please set --burden=TRUE
 
-	        """
-	        exit 1
-		}
-	}
+	//         """
+	//         exit 1
+	// 	}
+	// } else {
+	// 	if(params.burden) {
+	// 		traits_to_map
+	// 				.combine(vcf.combine(vcf_index))
+	// 				.combine(Channel.fromPath("${params.refflat}")) | burden_mapping | plot_burden
+	// 	}
+	// 	if(params.report) {
+	// 		println """
+
+	//         ERROR: HTML reports will not be generated because --finemap=FALSE. To generate HTML reports, please set --finemap=TRUE
+
+	//         """
+	//         exit 1
+	// 	}
+	// }
 	
 }
 
@@ -283,7 +284,6 @@ process fix_strain_names_bulk {
 
 	tag {"BULK TRAIT"}
 
-	label "R"
 	label "sm"
 
 	publishDir "${params.out}/Phenotypes", mode: 'copy', pattern: "*pr_*.tsv"
@@ -299,9 +299,9 @@ process fix_strain_names_bulk {
 
 	"""
 	# add R_libpath to .libPaths() into the R script, create a copy into the NF working directory 
-	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
+	#echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R > Fix_Isotype_names_bulk.R 
 
-	Rscript --vanilla Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names} ${workflow.projectDir}/bin/strain_isotype_lookup.tsv
+	Rscript --vanilla ${workflow.projectDir}/bin/Fix_Isotype_names_bulk.R ${phenotypes} ${params.fix_names} ${workflow.projectDir}/bin/strain_isotype_lookup.tsv
 	"""
 
 }
@@ -312,7 +312,6 @@ process vcf_to_geno_matrix {
 
 	publishDir "${params.out}/Genotype_Matrix", mode: 'copy'
 
-	label "plink"
 	label "sm"
 
 	input:
@@ -383,7 +382,6 @@ process chrom_eigen_variants {
 
 	tag { CHROM }
 
-	label "R"
 	label "md"
 
 	input:
@@ -398,8 +396,8 @@ process chrom_eigen_variants {
 	cat Genotype_Matrix.tsv |\\
 	awk -v chrom="${CHROM}" '{if(\$1 == "CHROM" || \$1 == chrom) print}' > ${CHROM}_gm.tsv
 
-	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R > Get_GenoMatrix_Eigen.R
-	Rscript --vanilla Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
+	#echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R > Get_GenoMatrix_Eigen.R
+	Rscript --vanilla ${workflow.projectDir}/bin/Get_GenoMatrix_Eigen.R ${CHROM}_gm.tsv ${CHROM}
 	"""
 
 }
@@ -447,7 +445,6 @@ process collect_eigen_variants {
 process rrblup_maps {
 
 	label "md"
-	label "R"
 
 	tag { TRAIT }
 
@@ -458,17 +455,17 @@ process rrblup_maps {
 	tuple file("independent_snvs.csv"), path(geno), val(TRAIT), path(pheno), val(P3D), val(sig_thresh), val(qtl_grouping_size), val(qtl_ci_size) 
 
 	output:
-	tuple TRAIT, path(geno), path(pheno), emit: "processed_map_to_ld"
+	tuple val(TRAIT), path(geno), path(pheno), emit: "processed_map_to_ld"
 	path "*processed_mapping.tsv", emit: processed_map_to_summary_plot
-	tuple TRAIT, path("*processed_mapping.tsv"), emit: "pr_maps_trait"
+	tuple val(TRAIT), path("*processed_mapping.tsv"), emit: "pr_maps_trait"
 	file("*.pdf")
 
 	"""
 	tests=`cat independent_snvs.csv | grep -v inde`
 
-	echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Run_Mappings.R > Run_Mappings.R
+	#echo ".libPaths(c(\\"${params.R_libpath}\\", .libPaths() ))" | cat - ${workflow.projectDir}/bin/Run_Mappings.R > Run_Mappings.R
 
-    Rscript --vanilla Run_Mappings.R ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
+    Rscript --vanilla ${workflow.projectDir}/bin/Run_Mappings.R ${geno} ${pheno} ${task.cpus} ${P3D} \$tests ${sig_thresh} ${qtl_grouping_size} ${qtl_ci_size}
 
 	if [ -e Rplots.pdf ]; then
 		rm Rplots.pdf
@@ -488,7 +485,6 @@ process summarize_maps {
 	publishDir "${params.out}/Mappings/Plots", mode: 'copy', pattern: "*mappings.pdf"
 	publishDir "${params.out}/Mappings/Data", mode: 'copy', pattern: "QTL_peaks.tsv"
 
-	label "R"
 	label "ml"
 
 	input:
@@ -533,7 +529,6 @@ process summarize_maps {
 process LD_between_regions {
 
 	label "xs"
-	label "R"
 
 	tag { TRAIT }
 
@@ -570,7 +565,6 @@ process LD_between_regions {
 process prep_ld_files {
 
 	label "ml"
-	label "plink"
 
 	tag {TRAIT}
 
@@ -664,7 +658,6 @@ process prep_ld_files {
 process rrblup_fine_maps {
 
 	label "md"
-	label "R"
 
 	errorStrategy { task.attempt == 3 ? 'ignore' : 'retry' }
 
@@ -745,7 +738,6 @@ process concatenate_LD_per_trait {
 process plot_genes {
 
 	label "ml"
-	label "R"
 
 	tag {phenotype}
 
@@ -780,7 +772,6 @@ process plot_genes {
 process burden_mapping {
 
 	label "sm"
-	label "R"
 
 	tag {TRAIT}
 
@@ -816,7 +807,6 @@ process burden_mapping {
 process plot_burden {
 
 	label "sm"
-	label "R"
 
 	tag {TRAIT}
 
@@ -860,7 +850,6 @@ val(TRAIT) into linkage_done
 process html_report_main {
 
 	label "md"
-	label "R"
 
 	errorStrategy 'ignore'
 
@@ -897,7 +886,6 @@ process html_report_main {
 process html_region_prep_table {
 
 	label "sm"
-	label "bedtools"
 
 	publishDir "${params.out}/Divergent_and_haplotype", mode: 'copy'
 
@@ -933,7 +921,6 @@ process html_report_region {
 	tag "$TRAIT $CHROM $peak_pos"
     
 	label "ml"
-	label "R"
 
     errorStrategy 'ignore'
 
@@ -997,7 +984,6 @@ workflow.onComplete {
 	Threshold for grouping QTL              = ${params.group_qtl}
 	Number of SNVs to define CI             = ${params.ci_size}
 	Fix isotype names and prune data        = ${params.fix_names}
-	Eigen Memory allocation                 = ${params.eigen_mem}
 	Path to R libraries.                    = ${params.R_libpath}
 
 	Burden mapping                          = ${params.burden}

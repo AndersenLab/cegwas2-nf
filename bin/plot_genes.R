@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(tidyr)
 library(R.utils)
 # library(cegwas2)
 
@@ -111,7 +113,7 @@ tidy_genes_in_region <- ugly_genes_in_region %>% {
 }
 
 write_tsv(tidy_genes_in_region,
-          path = glue::glue("{analysis_trait}_{ann_type}_genes.tsv"))
+          file = glue::glue("{analysis_trait}_{ann_type}_genes.tsv"))
 
 for(r in 1:length(unique(ugly_genes_in_region$start_pos))){
     

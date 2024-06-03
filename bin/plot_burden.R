@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
-library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(glue)
 
 # args:
 # 1 - trait name

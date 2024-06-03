@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
 
 list.files()
 

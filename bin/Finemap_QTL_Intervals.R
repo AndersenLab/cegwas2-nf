@@ -1,5 +1,8 @@
 #!/usr/bin/env Rscript
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(glue)
 library(rrBLUP)
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -95,7 +98,7 @@ pr_roi_ld <- roi_ld %>%
   dplyr::filter(value > 0) %>%
   dplyr::full_join(roi_genotype)
 
-readr::write_tsv(pr_roi_ld, path = glue::glue("{save_name}_prLD_df.tsv"))
+readr::write_tsv(pr_roi_ld, file = glue::glue("{save_name}_prLD_df.tsv"))
 
 peak_roi_marker <- dplyr::filter(pr_roi_ld, POS == peakp)
 

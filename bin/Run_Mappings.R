@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
 library(rrBLUP)
 library(ggbeeswarm)
 library(sommer)
@@ -387,7 +389,7 @@ processed_mapping <- process_mapping_df(raw_mapping,
 
 # save processed mapping data
 readr::write_tsv(processed_mapping, 
-                 path = glue::glue("{trait_name}_processed_mapping.tsv"),
+                 file = glue::glue("{trait_name}_processed_mapping.tsv"),
                  col_names = T)
 
 # generate manhattan plot

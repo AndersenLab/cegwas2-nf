@@ -1,5 +1,5 @@
 library(genetics) 
-library(tidyverse)
+library(dplyr)
 
 args <- commandArgs(trailingOnly=TRUE)
 gm <- read.table(file = args[1], header = T)

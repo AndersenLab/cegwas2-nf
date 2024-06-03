@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(glue)
 
 args = commandArgs(trailingOnly=TRUE)
 

@@ -1,7 +1,9 @@
 library(Rcpp)
-library(tidyverse)
-library(coop)
-library(RSpectra)
+library(dplyr)
+library(glue)
+library(readr)
+#library(coop)
+#library(RSpectra)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -49,12 +51,14 @@ for(chrom in 1:length(chrom_geno)){
     test_eigenvalues <- test_eigenvalues + eigen_increment
     
     print(glue::glue("Testing {test_eigenvalues} Eigenvalues"))
-    
-    snpcor <- coop::pcor(t(chrom_geno[[chrom]]))
-    snpeigen <- eigs_sym(snpcor, test_eigenvalues, opts = list(retvec = FALSE))
-    snpeigen$values[snpeigen$values>1] <- 1
-    
-    significant_eigenvalues <- sum(snpeigen$values)
+    #snpcor <- coor::pcor(t(chrom_geno[[chrom]]))
+    #snpeigen <- eigs_sym(snpcor, test_eigenvalues, opts = list(retvec = FALSE))
+    #snpeigen$values[snpeigen$values>1] <- 1
+
+    snpcor <- cor(t(chrom_geno[[chrom]]))
+    snpeigen <- sort(eigen(snpcor, symmetric=T, only.values=T)$values, decreasing=T)[1:test_eigenvalues]
+    snpeigen = as.numeric(snpeigen>=1)
+    significant_eigenvalues <- sum(snpeigen)
     
     if(significant_eigenvalues == test_eigenvalues){
       print(glue::glue("Significant Eigenvalues - {significant_eigenvalues} Exceeds or is Equal to the Number Tested {test_eigenvalues}\n Testing {eigen_increment} More"))
@@ -69,4 +73,4 @@ evals <- unlist(eigenvalues)
 
 independent_tests <- data.frame(independent_tests = sum(evals))
 
-readr::write_csv(independent_tests, path = glue::glue("{analysis_chromosome}_independent_snvs.csv"))
+readr::write_csv(independent_tests, file = glue::glue("{analysis_chromosome}_independent_snvs.csv"))
